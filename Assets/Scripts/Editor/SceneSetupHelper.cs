@@ -1,9 +1,9 @@
 using UnityEngine;
 using UnityEditor;
-
 using VRFerma;
 using VRFerma.VR;
 using System.IO;
+using System.Collections.Generic;
 
 namespace VRFerma.Editor
 {
@@ -12,12 +12,6 @@ namespace VRFerma.Editor
     /// </summary>
     public class SceneSetupHelper : EditorWindow
     {
-        [MenuItem("VR Ferma/Setup Scene")]
-        public static void ShowWindow()
-        {
-            GetWindow<SceneSetupHelper>("VR Ferma Scene Setup");
-        }
-
         [MenuItem("VR Ferma/Full Auto Setup")]
         public static void FullAutoSetup()
         {
@@ -42,6 +36,12 @@ namespace VRFerma.Editor
                 SceneSetupHelper helper = new SceneSetupHelper();
                 helper.ClearScene();
             }
+        }
+
+        [MenuItem("VR Ferma/Setup Scene")]
+        public static void ShowWindow()
+        {
+            GetWindow<SceneSetupHelper>("VR Ferma Scene Setup");
         }
 
         private void OnGUI()
@@ -142,37 +142,41 @@ namespace VRFerma.Editor
             Debug.Log("=== Starting Full Auto Setup ===");
             
             // 1. Setup Tags and Layers
-            Debug.Log("Step 1/8: Setting up tags and layers...");
+            Debug.Log("Step 1/9: Setting up tags and layers...");
             SetupTagsAndLayers();
             
             // 2. Create Managers
-            Debug.Log("Step 2/8: Creating managers...");
+            Debug.Log("Step 2/9: Creating managers...");
             CreateManagers();
             
             // 3. Create UI
-            Debug.Log("Step 3/8: Creating UI...");
+            Debug.Log("Step 3/9: Creating UI...");
             CreateBasicUI();
             
             // 4. Create Environment
-            Debug.Log("Step 4/8: Creating environment...");
+            Debug.Log("Step 4/9: Creating environment...");
             CreateGround();
             CreateWaterSource();
             
             // 5. Create Prefabs
-            Debug.Log("Step 5/8: Creating prefabs...");
+            Debug.Log("Step 5/9: Creating prefabs...");
             CreateAllPrefabs();
             
             // 6. Setup Managers Data
-            Debug.Log("Step 6/8: Setting up managers data...");
+            Debug.Log("Step 6/9: Setting up managers data...");
             SetupManagersData();
             
             // 7. Place Objects
-            Debug.Log("Step 7/8: Placing objects in scene...");
+            Debug.Log("Step 7/9: Placing objects in scene...");
             PlaceObjectsInScene();
             
             // 8. Check XR Origin
-            Debug.Log("Step 8/8: Checking XR Origin...");
+            Debug.Log("Step 8/9: Checking XR Origin...");
             CheckXROrigin();
+            
+            // 9. Setup Input System
+            Debug.Log("Step 9/9: Setting up Input System...");
+            SetupInputSystem();
             
             Debug.Log("=== Full Auto Setup Complete! ===");
         }
@@ -843,6 +847,70 @@ namespace VRFerma.Editor
             {
                 Debug.Log("XR Origin already exists in scene.");
             }
+
+            // Создаем также камеру для non-VR режима
+            CreateNonVRCamera();
+        }
+
+        private void CreateNonVRCamera()
+        {
+            // Проверяем, есть ли уже камера для non-VR
+            GameObject nonVRCamera = GameObject.Find("Non-VR Camera");
+            if (nonVRCamera == null)
+            {
+                // Отключаем все XR камеры, если они есть
+                Camera[] allCameras = FindObjectsOfType<Camera>();
+                foreach (Camera cam in allCameras)
+                {
+                    if (cam.name.Contains("XR") || cam.name.Contains("Left") || cam.name.Contains("Right") || cam.name.Contains("Main Camera"))
+                    {
+                        cam.gameObject.SetActive(false);
+                        Debug.Log("Disabled XR camera: " + cam.name);
+                    }
+                }
+
+                // Создаем камеру для non-VR режима
+                GameObject cameraObj = new GameObject("Non-VR Camera");
+                cameraObj.transform.position = new Vector3(0, 1.6f, 0);
+                
+                Camera camera = cameraObj.AddComponent<Camera>();
+                camera.tag = "MainCamera";
+                camera.fieldOfView = 75f;
+                cameraObj.AddComponent<AudioListener>();
+                
+                // Добавляем контроллер для клавиатуры
+                NonVRController controller = cameraObj.AddComponent<NonVRController>();
+                
+                Debug.Log("Non-VR Camera created! You can use keyboard controls (WASD) to move around.");
+                Debug.Log("Note: XR cameras have been disabled. To use VR, disable Non-VR Camera and enable XR Origin.");
+            }
+            else
+            {
+                Debug.Log("Non-VR Camera already exists in scene.");
+            }
+        }
+
+        private void SetupInputSystem()
+        {
+            // Переключаем на старый Input System для совместимости
+            var projectSettings = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/ProjectSettings.asset");
+            if (projectSettings.Length > 0)
+            {
+                SerializedObject settings = new SerializedObject(projectSettings[0]);
+                SerializedProperty activeInputHandler = settings.FindProperty("activeInputHandler");
+                
+                if (activeInputHandler != null && activeInputHandler.intValue != 0)
+                {
+                    activeInputHandler.intValue = 0; // 0 = старый Input System, 1 = новый, 2 = оба
+                    settings.ApplyModifiedProperties();
+                    Debug.Log("Input System: Switched to Legacy Input System (old Input Manager)");
+                    Debug.LogWarning("You may need to restart Unity Editor for changes to take effect!");
+                }
+                else
+                {
+                    Debug.Log("Input System: Already using Legacy Input System");
+                }
+            }
         }
 
         private void ClearScene()
@@ -899,6 +967,15 @@ namespace VRFerma.Editor
                 Debug.Log("Deleted: WaterSource");
             }
 
+            // Удаляем non-VR камеру
+            GameObject nonVRCamera = GameObject.Find("Non-VR Camera");
+            if (nonVRCamera != null)
+            {
+                DestroyImmediate(nonVRCamera);
+                deletedCount++;
+                Debug.Log("Deleted: Non-VR Camera");
+            }
+
             // Удаляем размещенные объекты (префабы)
             string[] prefabInstanceNames = new string[]
             {
@@ -922,8 +999,7 @@ namespace VRFerma.Editor
             }
 
             // Удаляем животных (Chicken_0, Chicken_1, Chicken_2 и т.д.)
-            // Сначала собираем список объектов для удаления
-            System.Collections.Generic.List<GameObject> chickensToDelete = new System.Collections.Generic.List<GameObject>();
+            List<GameObject> chickensToDelete = new List<GameObject>();
             GameObject[] allObjects = FindObjectsOfType<GameObject>();
             foreach (GameObject obj in allObjects)
             {
@@ -932,7 +1008,6 @@ namespace VRFerma.Editor
                     chickensToDelete.Add(obj);
                 }
             }
-            // Теперь удаляем
             foreach (GameObject obj in chickensToDelete)
             {
                 if (obj != null)
@@ -945,8 +1020,7 @@ namespace VRFerma.Editor
             }
 
             // Удаляем посаженные растения (если есть)
-            // Сначала собираем список
-            System.Collections.Generic.List<GameObject> cropsToDelete = new System.Collections.Generic.List<GameObject>();
+            List<GameObject> cropsToDelete = new List<GameObject>();
             PlantedCrop[] crops = FindObjectsOfType<PlantedCrop>();
             foreach (PlantedCrop crop in crops)
             {
@@ -955,7 +1029,6 @@ namespace VRFerma.Editor
                     cropsToDelete.Add(crop.gameObject);
                 }
             }
-            // Теперь удаляем
             foreach (GameObject cropObj in cropsToDelete)
             {
                 if (cropObj != null)
