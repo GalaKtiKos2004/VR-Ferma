@@ -6,12 +6,12 @@ namespace VRFerma.VR
     /// <summary>
     /// Компонент для семени, которое можно посадить
     /// </summary>
-    [RequireComponent(typeof(XRGrabInteractable))]
+    [RequireComponent(typeof(UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable))]
     public class Seed : MonoBehaviour
     {
         [Header("Seed Settings")]
         private CropManager.CropType cropType;
-        private XRGrabInteractable grabInteractable;
+        private UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable grabInteractable;
         private bool isPlanted = false;
 
         [Header("Planting")]
@@ -20,7 +20,7 @@ namespace VRFerma.VR
 
         private void Awake()
         {
-            grabInteractable = GetComponent<XRGrabInteractable>();
+            grabInteractable = GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
         }
 
         private void OnEnable()

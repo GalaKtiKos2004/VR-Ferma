@@ -6,7 +6,7 @@ namespace VRFerma.VR
     /// <summary>
     /// Скрипт для мешка с семенами, который можно взять в VR
     /// </summary>
-    [RequireComponent(typeof(XRGrabInteractable))]
+    [RequireComponent(typeof(UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable))]
     public class SeedBag : MonoBehaviour
     {
         [Header("Seed Settings")]
@@ -14,12 +14,12 @@ namespace VRFerma.VR
         [SerializeField] private int seedCount = 10;
         [SerializeField] private GameObject seedPrefab;
 
-        private XRGrabInteractable grabInteractable;
+        private UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable grabInteractable;
         private int currentSeedCount;
 
         private void Awake()
         {
-            grabInteractable = GetComponent<XRGrabInteractable>();
+            grabInteractable = GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
             currentSeedCount = seedCount;
         }
 

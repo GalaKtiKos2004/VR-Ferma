@@ -6,18 +6,18 @@ namespace VRFerma.VR
     /// <summary>
     /// Компонент для взаимодействия с животными в VR
     /// </summary>
-    [RequireComponent(typeof(XRSimpleInteractable))]
+    [RequireComponent(typeof(UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable))]
     public class AnimalInteractable : MonoBehaviour
     {
         [Header("Interaction Type")]
         [SerializeField] private bool isFeedAction = true; // true = кормление, false = поение
 
-        private XRSimpleInteractable interactable;
+        private UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable interactable;
         private FarmAnimal animal;
 
         private void Awake()
         {
-            interactable = GetComponent<XRSimpleInteractable>();
+            interactable = GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable>();
             animal = GetComponent<FarmAnimal>();
             
             if (animal == null)

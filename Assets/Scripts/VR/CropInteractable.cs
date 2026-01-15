@@ -6,15 +6,15 @@ namespace VRFerma.VR
     /// <summary>
     /// Компонент для взаимодействия с растениями в VR
     /// </summary>
-    [RequireComponent(typeof(XRSimpleInteractable))]
+    [RequireComponent(typeof(UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable))]
     public class CropInteractable : MonoBehaviour
     {
-        private XRSimpleInteractable interactable;
+        private UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable interactable;
         private PlantedCrop crop;
 
         private void Awake()
         {
-            interactable = GetComponent<XRSimpleInteractable>();
+            interactable = GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable>();
             crop = GetComponent<PlantedCrop>();
             
             if (crop == null)

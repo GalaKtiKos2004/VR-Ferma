@@ -6,19 +6,19 @@ namespace VRFerma.VR
     /// <summary>
     /// Компонент для взаимодействия с NPC (торговцем)
     /// </summary>
-    [RequireComponent(typeof(XRSimpleInteractable))]
+    [RequireComponent(typeof(UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable))]
     public class NPCInteractable : MonoBehaviour
     {
         [Header("NPC Settings")]
         [SerializeField] private string npcName = "Торговец";
         [SerializeField] private bool isTrader = true;
 
-        private XRSimpleInteractable interactable;
+        private UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable interactable;
         private TradingSystem tradingSystem;
 
         private void Awake()
         {
-            interactable = GetComponent<XRSimpleInteractable>();
+            interactable = GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable>();
             tradingSystem = FindObjectOfType<TradingSystem>();
             
             if (tradingSystem == null)

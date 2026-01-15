@@ -6,7 +6,7 @@ namespace VRFerma.VR
     /// <summary>
     /// Скрипт для лейки, которой можно поливать растения
     /// </summary>
-    [RequireComponent(typeof(XRGrabInteractable))]
+    [RequireComponent(typeof(UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable))]
     public class WateringCan : MonoBehaviour
     {
         [Header("Watering Settings")]
@@ -17,13 +17,13 @@ namespace VRFerma.VR
         [SerializeField] private ParticleSystem waterParticles;
         [SerializeField] private AudioSource waterSound;
 
-        private XRGrabInteractable grabInteractable;
+        private UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable grabInteractable;
         private float currentWater = 0f;
         private bool isWatering = false;
 
         private void Awake()
         {
-            grabInteractable = GetComponent<XRGrabInteractable>();
+            grabInteractable = GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
         }
 
         private void OnEnable()
