@@ -1,6 +1,9 @@
 using UnityEngine;
 using UnityEditor;
-using UnityEngine.XR.Interaction.Toolkit;
+
+using VRFerma;
+using VRFerma.VR;
+using System.IO;
 
 namespace VRFerma.Editor
 {
@@ -15,9 +18,48 @@ namespace VRFerma.Editor
             GetWindow<SceneSetupHelper>("VR Ferma Scene Setup");
         }
 
+        [MenuItem("VR Ferma/Full Auto Setup")]
+        public static void FullAutoSetup()
+        {
+            SceneSetupHelper helper = new SceneSetupHelper();
+            helper.DoFullAutoSetup();
+            EditorUtility.DisplayDialog("Setup Complete", "Scene has been fully configured!\n\nCheck the console for details.", "OK");
+        }
+
+        [MenuItem("VR Ferma/Clear Scene")]
+        public static void ClearSceneMenu()
+        {
+            if (EditorUtility.DisplayDialog("Clear Scene", 
+                "This will delete all automatically created objects:\n\n" +
+                "- All Managers\n" +
+                "- UI Canvas\n" +
+                "- Ground and Water Source\n" +
+                "- All placed prefab instances\n\n" +
+                "This action cannot be undone!\n\n" +
+                "Continue?", 
+                "Yes, Clear All", "Cancel"))
+            {
+                SceneSetupHelper helper = new SceneSetupHelper();
+                helper.ClearScene();
+            }
+        }
+
         private void OnGUI()
         {
             GUILayout.Label("VR Ferma Scene Setup", EditorStyles.boldLabel);
+            GUILayout.Space(10);
+
+            EditorGUILayout.HelpBox("Click 'Full Auto Setup' for complete automatic setup, or use individual buttons below.", MessageType.Info);
+            GUILayout.Space(10);
+
+            if (GUILayout.Button("🚀 FULL AUTO SETUP", GUILayout.Height(40)))
+            {
+                DoFullAutoSetup();
+                EditorUtility.DisplayDialog("Setup Complete", "Scene has been fully configured!\n\nCheck the console for details.", "OK");
+            }
+
+            GUILayout.Space(20);
+            GUILayout.Label("Manual Setup (Individual Steps):", EditorStyles.boldLabel);
             GUILayout.Space(10);
 
             if (GUILayout.Button("Create All Managers", GUILayout.Height(30)))
@@ -53,13 +95,86 @@ namespace VRFerma.Editor
                 CreateWaterSource();
             }
 
+            GUILayout.Space(10);
+
+            if (GUILayout.Button("Create Prefabs", GUILayout.Height(30)))
+            {
+                CreateAllPrefabs();
+            }
+
+            GUILayout.Space(10);
+
+            if (GUILayout.Button("Setup Managers Data", GUILayout.Height(30)))
+            {
+                SetupManagersData();
+            }
+
+            GUILayout.Space(10);
+
+            if (GUILayout.Button("Place Objects in Scene", GUILayout.Height(30)))
+            {
+                PlaceObjectsInScene();
+            }
+
             GUILayout.Space(20);
-            GUILayout.Label("Instructions:", EditorStyles.boldLabel);
-            GUILayout.Label("1. Click 'Create All Managers' first");
-            GUILayout.Label("2. Setup Tags and Layers");
-            GUILayout.Label("3. Create Basic UI");
-            GUILayout.Label("4. Create Ground and Water Source");
-            GUILayout.Label("5. Add prefabs manually (plants, animals, etc.)");
+            EditorGUILayout.HelpBox("Use 'Clear Scene' to remove all automatically created objects.", MessageType.Warning);
+            GUILayout.Space(10);
+
+            if (GUILayout.Button("🗑️ Clear Scene", GUILayout.Height(30)))
+            {
+                if (EditorUtility.DisplayDialog("Clear Scene", 
+                    "This will delete all automatically created objects:\n\n" +
+                    "- All Managers\n" +
+                    "- UI Canvas\n" +
+                    "- Ground and Water Source\n" +
+                    "- All placed prefab instances\n\n" +
+                    "This action cannot be undone!\n\n" +
+                    "Continue?", 
+                    "Yes, Clear All", "Cancel"))
+                {
+                    ClearScene();
+                }
+            }
+        }
+
+        private void DoFullAutoSetup()
+        {
+            Debug.Log("=== Starting Full Auto Setup ===");
+            
+            // 1. Setup Tags and Layers
+            Debug.Log("Step 1/8: Setting up tags and layers...");
+            SetupTagsAndLayers();
+            
+            // 2. Create Managers
+            Debug.Log("Step 2/8: Creating managers...");
+            CreateManagers();
+            
+            // 3. Create UI
+            Debug.Log("Step 3/8: Creating UI...");
+            CreateBasicUI();
+            
+            // 4. Create Environment
+            Debug.Log("Step 4/8: Creating environment...");
+            CreateGround();
+            CreateWaterSource();
+            
+            // 5. Create Prefabs
+            Debug.Log("Step 5/8: Creating prefabs...");
+            CreateAllPrefabs();
+            
+            // 6. Setup Managers Data
+            Debug.Log("Step 6/8: Setting up managers data...");
+            SetupManagersData();
+            
+            // 7. Place Objects
+            Debug.Log("Step 7/8: Placing objects in scene...");
+            PlaceObjectsInScene();
+            
+            // 8. Check XR Origin
+            Debug.Log("Step 8/8: Checking XR Origin...");
+            CheckXROrigin();
+            
+            Debug.Log("=== Full Auto Setup Complete! ===");
         }
 
         private void CreateManagers()
@@ -329,6 +444,536 @@ namespace VRFerma.Editor
             collider.isTrigger = true;
 
             Debug.Log("Water source created successfully!");
+        }
+
+        private void CreateAllPrefabs()
+        {
+            // Создаем папку для префабов если её нет
+            string prefabsPath = "Assets/Prefabs";
+            if (!AssetDatabase.IsValidFolder(prefabsPath))
+            {
+                AssetDatabase.CreateFolder("Assets", "Prefabs");
+            }
+
+            // Создаем префаб семени
+            GameObject seedObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            seedObj.name = "Seed";
+            seedObj.transform.localScale = new Vector3(0.1f, 0.1f, 0.1f);
+            seedObj.AddComponent<Rigidbody>();
+            seedObj.AddComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
+            seedObj.AddComponent<Seed>();
+            
+            // Настраиваем материал семени
+            Material seedMaterial = new Material(Shader.Find("Standard"));
+            seedMaterial.color = new Color(0.8f, 0.6f, 0.2f); // Коричневый
+            seedObj.GetComponent<Renderer>().material = seedMaterial;
+            
+            string seedPath = prefabsPath + "/Seed.prefab";
+            PrefabUtility.SaveAsPrefabAsset(seedObj, seedPath);
+            DestroyImmediate(seedObj);
+            Debug.Log("Seed prefab created: " + seedPath);
+
+            // Создаем префабы мешков с семенами для каждого типа
+            CreateSeedBag(CropManager.CropType.Carrot, new Color(1f, 0.6f, 0f), prefabsPath);
+            CreateSeedBag(CropManager.CropType.Tomato, new Color(1f, 0f, 0f), prefabsPath);
+            CreateSeedBag(CropManager.CropType.Pumpkin, new Color(1f, 0.5f, 0f), prefabsPath);
+            CreateSeedBag(CropManager.CropType.Corn, new Color(1f, 1f, 0f), prefabsPath);
+
+            // Создаем префабы растений
+            CreatePlantPrefab(CropManager.CropType.Carrot, new Color(1f, 0.6f, 0f), prefabsPath);
+            CreatePlantPrefab(CropManager.CropType.Tomato, new Color(1f, 0f, 0f), prefabsPath);
+            CreatePlantPrefab(CropManager.CropType.Pumpkin, new Color(1f, 0.5f, 0f), prefabsPath);
+            CreatePlantPrefab(CropManager.CropType.Corn, new Color(1f, 1f, 0f), prefabsPath);
+
+            // Создаем префаб лейки
+            CreateWateringCanPrefab(prefabsPath);
+
+            // Создаем префаб животного
+            CreateAnimalPrefab(AnimalManager.AnimalType.Chicken, prefabsPath);
+
+            // Создаем префаб торговца
+            CreateTraderPrefab(prefabsPath);
+
+            AssetDatabase.Refresh();
+            Debug.Log("All prefabs created successfully!");
+        }
+
+        private void CreateSeedBag(CropManager.CropType cropType, Color color, string prefabsPath)
+        {
+            GameObject bagObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            bagObj.name = "SeedBag_" + cropType.ToString();
+            bagObj.transform.localScale = new Vector3(0.3f, 0.4f, 0.3f);
+            
+            Material bagMaterial = new Material(Shader.Find("Standard"));
+            bagMaterial.color = color;
+            bagObj.GetComponent<Renderer>().material = bagMaterial;
+            
+            bagObj.AddComponent<Rigidbody>();
+            bagObj.AddComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
+            
+            SeedBag seedBag = bagObj.AddComponent<SeedBag>();
+            var seedTypeField = typeof(SeedBag).GetField("seedType", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            seedTypeField?.SetValue(seedBag, cropType);
+            
+            var seedCountField = typeof(SeedBag).GetField("seedCount", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            seedCountField?.SetValue(seedBag, 10);
+            
+            // Загружаем префаб семени
+            GameObject seedPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabsPath + "/Seed.prefab");
+            var seedPrefabField = typeof(SeedBag).GetField("seedPrefab", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            seedPrefabField?.SetValue(seedBag, seedPrefab);
+            
+            string bagPath = prefabsPath + "/SeedBag_" + cropType.ToString() + ".prefab";
+            PrefabUtility.SaveAsPrefabAsset(bagObj, bagPath);
+            DestroyImmediate(bagObj);
+            Debug.Log("SeedBag prefab created: " + bagPath);
+        }
+
+        private void CreatePlantPrefab(CropManager.CropType cropType, Color color, string prefabsPath)
+        {
+            GameObject plantObj = new GameObject("Plant_" + cropType.ToString());
+            
+            // Создаем стадии роста
+            GameObject seedStage = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            seedStage.name = "SeedStage";
+            seedStage.transform.SetParent(plantObj.transform);
+            seedStage.transform.localPosition = Vector3.zero;
+            seedStage.transform.localScale = new Vector3(0.1f, 0.1f, 0.1f);
+            Material seedMat = new Material(Shader.Find("Standard"));
+            seedMat.color = new Color(0.6f, 0.4f, 0.2f);
+            seedStage.GetComponent<Renderer>().material = seedMat;
+
+            GameObject growingStage = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            growingStage.name = "GrowingStage";
+            growingStage.transform.SetParent(plantObj.transform);
+            growingStage.transform.localPosition = Vector3.zero;
+            growingStage.transform.localScale = new Vector3(0.2f, 0.3f, 0.2f);
+            growingStage.SetActive(false);
+            Material growingMat = new Material(Shader.Find("Standard"));
+            growingMat.color = new Color(0.2f, 0.8f, 0.2f);
+            growingStage.GetComponent<Renderer>().material = growingMat;
+
+            GameObject readyStage = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            readyStage.name = "ReadyStage";
+            readyStage.transform.SetParent(plantObj.transform);
+            readyStage.transform.localPosition = Vector3.zero;
+            readyStage.transform.localScale = new Vector3(0.3f, 0.5f, 0.3f);
+            readyStage.SetActive(false);
+            Material readyMat = new Material(Shader.Find("Standard"));
+            readyMat.color = color;
+            readyStage.GetComponent<Renderer>().material = readyMat;
+
+            // Добавляем компоненты
+            plantObj.AddComponent<SphereCollider>();
+            plantObj.AddComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable>();
+            plantObj.AddComponent<CropInteractable>();
+            
+            PlantedCrop plantedCrop = plantObj.AddComponent<PlantedCrop>();
+            var seedStageField = typeof(PlantedCrop).GetField("seedStage", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            seedStageField?.SetValue(plantedCrop, seedStage);
+            var growingStageField = typeof(PlantedCrop).GetField("growingStage", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            growingStageField?.SetValue(plantedCrop, growingStage);
+            var readyStageField = typeof(PlantedCrop).GetField("readyStage", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            readyStageField?.SetValue(plantedCrop, readyStage);
+
+            string plantPath = prefabsPath + "/Plant_" + cropType.ToString() + ".prefab";
+            PrefabUtility.SaveAsPrefabAsset(plantObj, plantPath);
+            DestroyImmediate(plantObj);
+            Debug.Log("Plant prefab created: " + plantPath);
+        }
+
+        private void CreateWateringCanPrefab(string prefabsPath)
+        {
+            GameObject canObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            canObj.name = "WateringCan";
+            canObj.transform.localScale = new Vector3(0.2f, 0.3f, 0.2f);
+            
+            Material canMaterial = new Material(Shader.Find("Standard"));
+            canMaterial.color = new Color(0.3f, 0.3f, 0.8f);
+            canObj.GetComponent<Renderer>().material = canMaterial;
+            
+            canObj.AddComponent<Rigidbody>();
+            canObj.AddComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
+            
+            WateringCan wateringCan = canObj.AddComponent<WateringCan>();
+            var waterCapacityField = typeof(WateringCan).GetField("waterCapacity", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            waterCapacityField?.SetValue(wateringCan, 100f);
+            var waterPerSecondField = typeof(WateringCan).GetField("waterPerSecond", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            waterPerSecondField?.SetValue(wateringCan, 10f);
+            var wateringRangeField = typeof(WateringCan).GetField("wateringRange", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            wateringRangeField?.SetValue(wateringCan, 2f);
+
+            // Добавляем Particle System
+            GameObject particlesObj = new GameObject("WaterParticles");
+            particlesObj.transform.SetParent(canObj.transform);
+            particlesObj.transform.localPosition = new Vector3(0, -0.15f, 0);
+            ParticleSystem particles = particlesObj.AddComponent<ParticleSystem>();
+            var main = particles.main;
+            main.startLifetime = 0.5f;
+            main.startSpeed = 5f;
+            main.startSize = 0.1f;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.playOnAwake = false;
+            var emission = particles.emission;
+            emission.enabled = false;
+            
+            var psField = typeof(WateringCan).GetField("waterParticles", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            psField?.SetValue(wateringCan, particles);
+
+            string canPath = prefabsPath + "/WateringCan.prefab";
+            PrefabUtility.SaveAsPrefabAsset(canObj, canPath);
+            DestroyImmediate(canObj);
+            Debug.Log("WateringCan prefab created: " + canPath);
+        }
+
+        private void CreateAnimalPrefab(AnimalManager.AnimalType animalType, string prefabsPath)
+        {
+            GameObject animalObj = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            animalObj.name = "Animal_" + animalType.ToString();
+            animalObj.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
+            
+            Material animalMaterial = new Material(Shader.Find("Standard"));
+            animalMaterial.color = new Color(1f, 0.8f, 0.6f); // Светло-коричневый
+            animalObj.GetComponent<Renderer>().material = animalMaterial;
+            
+            animalObj.AddComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable>();
+            
+            AnimalInteractable animalInteractable = animalObj.AddComponent<AnimalInteractable>();
+            var isFeedActionField = typeof(AnimalInteractable).GetField("isFeedAction", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            isFeedActionField?.SetValue(animalInteractable, true);
+            
+            FarmAnimal farmAnimal = animalObj.AddComponent<FarmAnimal>();
+
+            string animalPath = prefabsPath + "/Animal_" + animalType.ToString() + ".prefab";
+            PrefabUtility.SaveAsPrefabAsset(animalObj, animalPath);
+            DestroyImmediate(animalObj);
+            Debug.Log("Animal prefab created: " + animalPath);
+        }
+
+        private void CreateTraderPrefab(string prefabsPath)
+        {
+            GameObject traderObj = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            traderObj.name = "Trader";
+            traderObj.transform.localScale = new Vector3(1f, 2f, 1f);
+            
+            Material traderMaterial = new Material(Shader.Find("Standard"));
+            traderMaterial.color = new Color(0.5f, 0.3f, 0.8f); // Фиолетовый
+            traderObj.GetComponent<Renderer>().material = traderMaterial;
+            
+            traderObj.AddComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable>();
+            
+            NPCInteractable npcInteractable = traderObj.AddComponent<NPCInteractable>();
+            var npcNameField = typeof(NPCInteractable).GetField("npcName", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            npcNameField?.SetValue(npcInteractable, "Торговец");
+            var isTraderField = typeof(NPCInteractable).GetField("isTrader", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            isTraderField?.SetValue(npcInteractable, true);
+
+            string traderPath = prefabsPath + "/Trader.prefab";
+            PrefabUtility.SaveAsPrefabAsset(traderObj, traderPath);
+            DestroyImmediate(traderObj);
+            Debug.Log("Trader prefab created: " + traderPath);
+        }
+
+        private void SetupManagersData()
+        {
+            // Настройка CropManager
+            CropManager cropManager = FindObjectOfType<CropManager>();
+            if (cropManager != null)
+            {
+                var cropTypesField = typeof(CropManager).GetField("cropTypes", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                var cropTypes = cropTypesField?.GetValue(cropManager) as System.Collections.Generic.List<CropManager.CropData>;
+                
+                if (cropTypes != null && cropTypes.Count == 0)
+                {
+                    string prefabsPath = "Assets/Prefabs";
+                    
+                    // Морковь
+                    AddCropData(cropTypes, CropManager.CropType.Carrot, "Морковь", 30f, 10, prefabsPath);
+                    // Помидор
+                    AddCropData(cropTypes, CropManager.CropType.Tomato, "Помидор", 45f, 15, prefabsPath);
+                    // Тыква
+                    AddCropData(cropTypes, CropManager.CropType.Pumpkin, "Тыква", 60f, 25, prefabsPath);
+                    // Кукуруза
+                    AddCropData(cropTypes, CropManager.CropType.Corn, "Кукуруза", 40f, 20, prefabsPath);
+                }
+            }
+
+            // Настройка AnimalManager
+            AnimalManager animalManager = FindObjectOfType<AnimalManager>();
+            if (animalManager != null)
+            {
+                var animalTypesField = typeof(AnimalManager).GetField("animalTypes", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                var animalTypes = animalTypesField?.GetValue(animalManager) as System.Collections.Generic.List<AnimalManager.AnimalData>;
+                
+                if (animalTypes != null && animalTypes.Count == 0)
+                {
+                    string prefabsPath = "Assets/Prefabs";
+                    
+                    // Курица
+                    AddAnimalData(animalTypes, AnimalManager.AnimalType.Chicken, "Курица", 30f, 20f, 5, prefabsPath);
+                }
+            }
+
+            Debug.Log("Managers data setup complete!");
+        }
+
+        private void AddCropData(System.Collections.Generic.List<CropManager.CropData> cropTypes, CropManager.CropType type, string name, float growthTime, int sellPrice, string prefabsPath)
+        {
+            CropManager.CropData cropData = new CropManager.CropData();
+            cropData.type = type;
+            cropData.name = name;
+            cropData.growthTime = growthTime;
+            cropData.sellPrice = sellPrice;
+            
+            // Загружаем префабы
+            GameObject seedPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabsPath + "/SeedBag_" + type.ToString() + ".prefab");
+            GameObject plantPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabsPath + "/Plant_" + type.ToString() + ".prefab");
+            
+            cropData.seedPrefab = seedPrefab;
+            cropData.plantPrefab = plantPrefab;
+            
+            cropTypes.Add(cropData);
+        }
+
+        private void AddAnimalData(System.Collections.Generic.List<AnimalManager.AnimalData> animalTypes, AnimalManager.AnimalType type, string name, float feedInterval, float waterInterval, int happinessReward, string prefabsPath)
+        {
+            AnimalManager.AnimalData animalData = new AnimalManager.AnimalData();
+            animalData.type = type;
+            animalData.name = name;
+            animalData.feedInterval = feedInterval;
+            animalData.waterInterval = waterInterval;
+            animalData.happinessReward = happinessReward;
+            
+            GameObject animalPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabsPath + "/Animal_" + type.ToString() + ".prefab");
+            animalData.prefab = animalPrefab;
+            
+            animalTypes.Add(animalData);
+        }
+
+        private void PlaceObjectsInScene()
+        {
+            string prefabsPath = "Assets/Prefabs";
+            
+            // Размещаем мешки с семенами
+            Vector3[] seedBagPositions = new Vector3[]
+            {
+                new Vector3(-3f, 1f, 2f),
+                new Vector3(-2f, 1f, 2f),
+                new Vector3(-1f, 1f, 2f),
+                new Vector3(0f, 1f, 2f)
+            };
+            
+            CropManager.CropType[] cropTypes = new CropManager.CropType[]
+            {
+                CropManager.CropType.Carrot,
+                CropManager.CropType.Tomato,
+                CropManager.CropType.Pumpkin,
+                CropManager.CropType.Corn
+            };
+            
+            for (int i = 0; i < seedBagPositions.Length && i < cropTypes.Length; i++)
+            {
+                GameObject seedBagPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabsPath + "/SeedBag_" + cropTypes[i].ToString() + ".prefab");
+                if (seedBagPrefab != null)
+                {
+                    GameObject instance = PrefabUtility.InstantiatePrefab(seedBagPrefab) as GameObject;
+                    instance.transform.position = seedBagPositions[i];
+                    instance.name = "SeedBag_" + cropTypes[i].ToString() + "_Instance";
+                }
+            }
+
+            // Размещаем лейку
+            GameObject wateringCanPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabsPath + "/WateringCan.prefab");
+            if (wateringCanPrefab != null)
+            {
+                GameObject instance = PrefabUtility.InstantiatePrefab(wateringCanPrefab) as GameObject;
+                instance.transform.position = new Vector3(4f, 1f, 5f);
+                instance.name = "WateringCan_Instance";
+            }
+
+            // Размещаем животных
+            GameObject chickenPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabsPath + "/Animal_Chicken.prefab");
+            if (chickenPrefab != null)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    GameObject instance = PrefabUtility.InstantiatePrefab(chickenPrefab) as GameObject;
+                    instance.transform.position = new Vector3(-5f + i * 1.5f, 0.5f, -3f);
+                    instance.name = "Chicken_" + i;
+                }
+            }
+
+            // Размещаем торговца
+            GameObject traderPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabsPath + "/Trader.prefab");
+            if (traderPrefab != null)
+            {
+                GameObject instance = PrefabUtility.InstantiatePrefab(traderPrefab) as GameObject;
+                instance.transform.position = new Vector3(0f, 1f, -5f);
+                instance.name = "Trader_Instance";
+            }
+
+            Debug.Log("Objects placed in scene successfully!");
+        }
+
+        private void CheckXROrigin()
+        {
+            // Проверяем наличие XR Origin
+            GameObject xrOrigin = GameObject.Find("XR Origin (XR Rig)");
+            if (xrOrigin == null)
+            {
+                // Пытаемся найти префаб XR Origin
+                string[] guids = AssetDatabase.FindAssets("XR Origin (XR Rig) t:Prefab");
+                if (guids.Length > 0)
+                {
+                    string path = AssetDatabase.GUIDToAssetPath(guids[0]);
+                    GameObject xrOriginPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                    if (xrOriginPrefab != null)
+                    {
+                        GameObject instance = PrefabUtility.InstantiatePrefab(xrOriginPrefab) as GameObject;
+                        instance.transform.position = Vector3.zero;
+                        Debug.Log("XR Origin added to scene from prefab: " + path);
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning("XR Origin not found in scene and prefab not found. Please add XR Origin manually!");
+                }
+            }
+            else
+            {
+                Debug.Log("XR Origin already exists in scene.");
+            }
+        }
+
+        private void ClearScene()
+        {
+            Debug.Log("=== Starting Scene Cleanup ===");
+            int deletedCount = 0;
+
+            // Удаляем менеджеры
+            string[] managerNames = new string[]
+            {
+                "GameManager",
+                "CropManager",
+                "AnimalManager",
+                "AchievementManager",
+                "TutorialManager",
+                "TradingSystem",
+                "UIManager"
+            };
+
+            foreach (string managerName in managerNames)
+            {
+                GameObject manager = GameObject.Find(managerName);
+                if (manager != null)
+                {
+                    DestroyImmediate(manager);
+                    deletedCount++;
+                    Debug.Log("Deleted: " + managerName);
+                }
+            }
+
+            // Удаляем UI
+            Canvas canvas = FindObjectOfType<Canvas>();
+            if (canvas != null && canvas.name == "Canvas")
+            {
+                DestroyImmediate(canvas.gameObject);
+                deletedCount++;
+                Debug.Log("Deleted: Canvas");
+            }
+
+            // Удаляем окружение
+            GameObject ground = GameObject.Find("Ground");
+            if (ground != null)
+            {
+                DestroyImmediate(ground);
+                deletedCount++;
+                Debug.Log("Deleted: Ground");
+            }
+
+            GameObject waterSource = GameObject.Find("WaterSource");
+            if (waterSource != null)
+            {
+                DestroyImmediate(waterSource);
+                deletedCount++;
+                Debug.Log("Deleted: WaterSource");
+            }
+
+            // Удаляем размещенные объекты (префабы)
+            string[] prefabInstanceNames = new string[]
+            {
+                "SeedBag_Carrot_Instance",
+                "SeedBag_Tomato_Instance",
+                "SeedBag_Pumpkin_Instance",
+                "SeedBag_Corn_Instance",
+                "WateringCan_Instance",
+                "Trader_Instance"
+            };
+
+            foreach (string instanceName in prefabInstanceNames)
+            {
+                GameObject instance = GameObject.Find(instanceName);
+                if (instance != null)
+                {
+                    DestroyImmediate(instance);
+                    deletedCount++;
+                    Debug.Log("Deleted: " + instanceName);
+                }
+            }
+
+            // Удаляем животных (Chicken_0, Chicken_1, Chicken_2 и т.д.)
+            // Сначала собираем список объектов для удаления
+            System.Collections.Generic.List<GameObject> chickensToDelete = new System.Collections.Generic.List<GameObject>();
+            GameObject[] allObjects = FindObjectsOfType<GameObject>();
+            foreach (GameObject obj in allObjects)
+            {
+                if (obj != null && obj.name.StartsWith("Chicken_"))
+                {
+                    chickensToDelete.Add(obj);
+                }
+            }
+            // Теперь удаляем
+            foreach (GameObject obj in chickensToDelete)
+            {
+                if (obj != null)
+                {
+                    string objName = obj.name;
+                    DestroyImmediate(obj);
+                    deletedCount++;
+                    Debug.Log("Deleted: " + objName);
+                }
+            }
+
+            // Удаляем посаженные растения (если есть)
+            // Сначала собираем список
+            System.Collections.Generic.List<GameObject> cropsToDelete = new System.Collections.Generic.List<GameObject>();
+            PlantedCrop[] crops = FindObjectsOfType<PlantedCrop>();
+            foreach (PlantedCrop crop in crops)
+            {
+                if (crop != null && crop.gameObject != null)
+                {
+                    cropsToDelete.Add(crop.gameObject);
+                }
+            }
+            // Теперь удаляем
+            foreach (GameObject cropObj in cropsToDelete)
+            {
+                if (cropObj != null)
+                {
+                    string cropName = cropObj.name;
+                    DestroyImmediate(cropObj);
+                    deletedCount++;
+                    Debug.Log("Deleted planted crop: " + cropName);
+                }
+            }
+
+            // Очищаем выделение
+            Selection.activeGameObject = null;
+
+            Debug.Log($"=== Scene Cleanup Complete! Deleted {deletedCount} objects ===");
+            EditorUtility.DisplayDialog("Scene Cleared", 
+                $"Successfully deleted {deletedCount} objects from the scene.", 
+                "OK");
         }
     }
 }
