@@ -52,6 +52,10 @@ public class TutorialManager : MonoBehaviour
             Instance = this;
         else
             Destroy(gameObject);
+
+        // Обучение проходится один раз; состояние хранится в PlayerPrefs (сброс — через редактор).
+        if (PlayerPrefs.GetInt("TutorialCompleted", 0) == 1)
+            tutorialCompleted = true;
     }
     
     private void Start()
@@ -90,10 +94,10 @@ public class TutorialManager : MonoBehaviour
     
     private IEnumerator StartTutorial()
     {
-        yield return new WaitForSeconds(1f);
+        yield return new WaitForSeconds(0.5f);
         if (SimpleGameManager.Instance != null)
-            SimpleGameManager.Instance.ShowHint("Добро пожаловать на ферму! Начнём обучение.", 4f);
-        yield return new WaitForSeconds(4f);
+            SimpleGameManager.Instance.ShowHint("Добро пожаловать на ферму! Начнём обучение.", 2f);
+        yield return new WaitForSeconds(2f);
         StartStep1_TakeHoe();
     }
     
@@ -123,7 +127,7 @@ public class TutorialManager : MonoBehaviour
     
     private IEnumerator WaitAndStartStep2()
     {
-        yield return new WaitForSeconds(1f);
+        yield return new WaitForSeconds(0.3f);
         StartStep2_TillBed();
     }
     
@@ -148,7 +152,7 @@ public class TutorialManager : MonoBehaviour
     
     private IEnumerator WaitAndStartStep3()
     {
-        yield return new WaitForSeconds(1f);
+        yield return new WaitForSeconds(0.3f);
         StartStep3_TakeRake();
     }
     
@@ -176,7 +180,7 @@ public class TutorialManager : MonoBehaviour
     
     private IEnumerator WaitAndStartStep4()
     {
-        yield return new WaitForSeconds(1f);
+        yield return new WaitForSeconds(0.3f);
         StartStep4_RakeBed();
     }
     
@@ -201,7 +205,7 @@ public class TutorialManager : MonoBehaviour
     
     private IEnumerator WaitAndStartStep5()
     {
-        yield return new WaitForSeconds(1f);
+        yield return new WaitForSeconds(0.3f);
         StartStep5_TakeSeeds();
     }
     
@@ -236,7 +240,7 @@ public class TutorialManager : MonoBehaviour
     
     private IEnumerator WaitAndStartStep6()
     {
-        yield return new WaitForSeconds(1f);
+        yield return new WaitForSeconds(0.3f);
         StartStep6_PlantSeed();
     }
     
@@ -261,7 +265,7 @@ public class TutorialManager : MonoBehaviour
     
     private IEnumerator WaitAndStartStep7()
     {
-        yield return new WaitForSeconds(1f);
+        yield return new WaitForSeconds(0.3f);
         StartStep7_TakeCan();
     }
     
@@ -286,7 +290,7 @@ public class TutorialManager : MonoBehaviour
     
     private IEnumerator WaitAndStartStep8()
     {
-        yield return new WaitForSeconds(1f);
+        yield return new WaitForSeconds(0.3f);
         StartStep8_FillCan();
     }
     
@@ -311,7 +315,7 @@ public class TutorialManager : MonoBehaviour
     
     private IEnumerator WaitAndStartStep9()
     {
-        yield return new WaitForSeconds(1f);
+        yield return new WaitForSeconds(0.3f);
         StartStep9_WaterPlant();
     }
     

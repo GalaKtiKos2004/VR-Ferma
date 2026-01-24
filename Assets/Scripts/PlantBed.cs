@@ -162,8 +162,30 @@ public class PlantBed : MonoBehaviour
             audioSource.PlayOneShot(harvestSound);
         else if (plantingSound != null && audioSource != null)
             audioSource.PlayOneShot(plantingSound);
+
+        // Определяем тип овоща и добавляем ресурсы
+        string cropType = (plantedSeedType ?? "").Trim();
         if (SimpleGameManager.Instance != null)
-            SimpleGameManager.Instance.AddCarrot(1);
+        {
+            if (string.Equals(cropType, "Тыква", System.StringComparison.OrdinalIgnoreCase))
+                SimpleGameManager.Instance.AddPumpkin(1);
+            else if (string.Equals(cropType, "Помидор", System.StringComparison.OrdinalIgnoreCase))
+                SimpleGameManager.Instance.AddTomato(1);
+            else if (string.Equals(cropType, "Морковь", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(cropType, "Морковка", System.StringComparison.OrdinalIgnoreCase))
+                SimpleGameManager.Instance.AddCarrot(1);
+            else if (string.Equals(cropType, "Лук", System.StringComparison.OrdinalIgnoreCase))
+                SimpleGameManager.Instance.AddOnion(1);
+            else
+                SimpleGameManager.Instance.AddCarrot(1); // По умолчанию
+        }
+
+        // Разблокируем достижение за первый урожай
+        if (AchievementManager.Instance != null && !string.IsNullOrEmpty(cropType))
+        {
+            AchievementManager.Instance.UnlockFirstHarvest(cropType);
+        }
+
         if (TutorialManager.Instance != null)
             TutorialManager.Instance.OnHarvestCollected();
 

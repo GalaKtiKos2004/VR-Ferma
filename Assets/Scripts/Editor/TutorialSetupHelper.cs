@@ -25,11 +25,41 @@ public class TutorialSetupHelper : EditorWindow
     private const string HoePrefabPath = "Assets/Prefabs/Hoe.prefab";
     private const string MeshokModelPath = "Assets/Models/Norm/мешок.fbx";
     
-    [MenuItem("VR-Ferma/Tutorial Setup Helper")]
+    private int selectedTab = 0;
+    private Vector2 scrollPosition;
+    
+    [MenuItem("VR-Ferma/Setup Helper")]
     public static void ShowWindow()
     {
         GetWindow<TutorialSetupHelper>("Tutorial Setup");
     }
+    
+    [MenuItem("VR-Ferma/Сбросить достижения")]
+    public static void ResetAchievementsMenuItem()
+    {
+        if (!EditorUtility.DisplayDialog("Сброс достижений",
+            "Вы уверены, что хотите сбросить все достижения?\n\nЭто удалит все разблокированные достижения и скроет их с экрана.",
+            "Да, сбросить", "Отмена"))
+        {
+            return;
+        }
+
+        AchievementManager am = Object.FindObjectOfType<AchievementManager>();
+        if (am != null)
+        {
+            am.ResetAchievements();
+            EditorUtility.DisplayDialog("Готово", "Все достижения сброшены!", "OK");
+        }
+        else
+        {
+            // Если AchievementManager нет в сцене, просто очищаем PlayerPrefs
+            PlayerPrefs.DeleteKey("Achievements");
+            PlayerPrefs.Save();
+            EditorUtility.DisplayDialog("Готово", "Достижения сброшены из PlayerPrefs!\n\n(AchievementManager не найден в сцене)", "OK");
+        }
+    }
+
+    private const string EditorPrefsScenePathKey = "VRFerma_AutosetupScenePath";
     
     [MenuItem("VR-Ferma/Сохранить текущую сцену для автонастройки")]
     public static void SaveCurrentSceneForAutosetup()
@@ -46,9 +76,13 @@ public class TutorialSetupHelper : EditorWindow
         {
             AssetDatabase.SaveAssets();
             string path = string.IsNullOrEmpty(active.path) ? active.name : active.path;
+            if (!string.IsNullOrEmpty(active.path))
+            {
+                EditorPrefs.SetString(EditorPrefsScenePathKey, active.path);
+            }
             Debug.Log($"[Tutorial Setup] Сцена сохранена для автонастройки: {path}");
             EditorUtility.DisplayDialog("Сохранено", 
-                $"Текущая сцена сохранена!\n\n{path}\n\nЕё можно использовать для автонастройки (Tutorial Setup Helper → Автоматическая настройка).", 
+                $"Текущая сцена сохранена!\n\n{path}\n\nПри «Создать простую ферму» будет открыта эта сцена.\n\nАвтонастройка: Tutorial Setup Helper → Автоматическая настройка.", 
                 "OK");
         }
         else
@@ -57,15 +91,42 @@ public class TutorialSetupHelper : EditorWindow
         }
     }
     
+    public static string GetSavedAutosetupScenePath()
+    {
+        return EditorPrefs.GetString(EditorPrefsScenePathKey, "");
+    }
+    
     private void OnGUI()
     {
         GUILayout.Label("Настройка системы обучения", EditorStyles.boldLabel);
         
-        EditorGUILayout.Space();
-        EditorGUILayout.HelpBox("Перетащите объекты из сцены в поля ниже.\n\n• Грабли/тяпка: VR-Ferma → Создать префабы граблей и тяпки\n• Грядки: VR-Ferma → Подставить модели Norm в грядки\n• Модели из Blender с камерой/светом: VR-Ferma → Убрать камеры и свет из моделей Norm (FBX)", MessageType.Info);
+        string[] tabs = { "Автонастройка", "Быстрые действия" };
+        selectedTab = GUILayout.Toolbar(selectedTab, tabs);
         EditorGUILayout.Space();
         
-        // Поля для объектов
+        scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
+        
+        if (selectedTab == 0)
+            DrawAutosetupTab();
+        else
+            DrawQuickActionsTab();
+        
+        EditorGUILayout.EndScrollView();
+    }
+    
+    /// <summary>
+    /// Вкладка «Автонастройка» — всё для однокнопочной настройки в одном месте.
+    /// </summary>
+    private void DrawAutosetupTab()
+    {
+        EditorGUILayout.HelpBox(
+            "Перетащите объекты из сцены в поля ниже (или нажмите «Найти объекты»).\n\n" +
+            "• Грабли/тяпка: VR-Ferma → Создать префабы граблей и тяпки\n" +
+            "• Грядки: VR-Ferma → Подставить модели Norm в грядки\n" +
+            "• Модели из Blender с камерой/светом: VR-Ferma → Убрать камеры и свет из моделей Norm (FBX)",
+            MessageType.Info);
+        EditorGUILayout.Space();
+        
         barn = (GameObject)EditorGUILayout.ObjectField("Сарай (Barn)", barn, typeof(GameObject), true);
         rake = (GameObject)EditorGUILayout.ObjectField("Грабли (Rake)", rake, typeof(GameObject), true);
         hoe = (GameObject)EditorGUILayout.ObjectField("Тяпка (Hoe)", hoe, typeof(GameObject), true);
@@ -79,68 +140,25 @@ public class TutorialSetupHelper : EditorWindow
         well = (GameObject)EditorGUILayout.ObjectField("Колодец (Well)", well, typeof(GameObject), true);
         
         EditorGUILayout.Space();
-        EditorGUILayout.Space();
         
-        // Кнопки быстрых действий
-        GUILayout.Label("Быстрые действия:", EditorStyles.boldLabel);
+        if (GUILayout.Button("Найти объекты в сцене", GUILayout.Height(24)))
+            FindObjectsInScene();
         
-        if (GUILayout.Button("1. Создать Tutorial Manager", GUILayout.Height(30)))
-        {
-            CreateTutorialManager();
-        }
-        
-        if (GUILayout.Button("2. Создать грабли (Rake) — модель грабли.fbx", GUILayout.Height(30)))
-        {
-            CreateRake();
-        }
-        
-        if (GUILayout.Button("2b. Создать тяпку (Hoe) — модель тяпка.fbx", GUILayout.Height(30)))
-        {
-            CreateHoe();
-        }
-        
-        if (GUILayout.Button("3. Создать пакеты семян (тыква + помидор + морковь + лук)", GUILayout.Height(30)))
-        {
-            CreateSeedBags();
-        }
-        
-        if (GUILayout.Button("4. Настроить колодец (тег Water)", GUILayout.Height(30)))
-        {
-            SetupWell();
-        }
-        
-        EditorGUILayout.Space();
-        
-        if (GUILayout.Button("5. Создать слой PlantBed", GUILayout.Height(30)))
-        {
-            CreatePlantBedLayer();
-        }
-        
-        if (GUILayout.Button("5b. Подставить модели Norm в грядки", GUILayout.Height(30)))
-        {
-            PlantBedNormModels.AssignNormModelsToPlantBeds();
-        }
-        
-        if (GUILayout.Button("5c. Убрать камеры и свет из моделей Norm (FBX)", GUILayout.Height(28)))
-        {
-            StripNormCamerasLights.DisableCamerasLightsImportAndReimport();
-        }
-        
-        EditorGUILayout.Space();
-        EditorGUILayout.Space();
-        
-        // Автоматическая настройка
-        GUI.backgroundColor = Color.green;
-        if (GUILayout.Button("🚀 АВТОМАТИЧЕСКАЯ НАСТРОЙКА ВСЕГО", GUILayout.Height(50)))
-        {
-            AutoSetup();
-        }
+        GUI.backgroundColor = new Color(0.6f, 0.85f, 1f);
+        if (GUILayout.Button("💾 Сохранить текущую сцену для автонастройки", GUILayout.Height(28)))
+            SaveCurrentSceneForAutosetup();
         GUI.backgroundColor = Color.white;
         
         EditorGUILayout.Space();
+        EditorGUILayout.Space();
         
-        // Утилиты
-        GUILayout.Label("Утилиты:", EditorStyles.boldLabel);
+        GUI.backgroundColor = Color.green;
+        if (GUILayout.Button("🚀 АВТОМАТИЧЕСКАЯ НАСТРОЙКА ВСЕГО", GUILayout.Height(50)))
+            AutoSetup();
+        GUI.backgroundColor = Color.white;
+        
+        EditorGUILayout.Space();
+        GUILayout.Label("Утилиты", EditorStyles.boldLabel);
         
         if (GUILayout.Button("Сбросить обучение (PlayerPrefs)"))
         {
@@ -150,19 +168,75 @@ public class TutorialSetupHelper : EditorWindow
             EditorUtility.DisplayDialog("Успех", "Обучение сброшено!", "OK");
         }
         
-        if (GUILayout.Button("Найти объекты в сцене"))
-        {
-            FindObjectsInScene();
-        }
+        if (GUILayout.Button("Сбросить достижения (PlayerPrefs)"))
+            DoResetAchievements();
+    }
+    
+    /// <summary>
+    /// Вкладка «Быстрые действия» — пошаговые кнопки.
+    /// </summary>
+    private void DrawQuickActionsTab()
+    {
+        GUILayout.Label("Быстрые действия:", EditorStyles.boldLabel);
+        
+        if (GUILayout.Button("1. Создать Tutorial Manager", GUILayout.Height(30)))
+            CreateTutorialManager();
+        if (GUILayout.Button("2. Создать грабли (Rake) — модель грабли.fbx", GUILayout.Height(30)))
+            CreateRake();
+        if (GUILayout.Button("2b. Создать тяпку (Hoe) — модель тяпка.fbx", GUILayout.Height(30)))
+            CreateHoe();
+        if (GUILayout.Button("3. Создать пакеты семян (тыква + помидор + морковь + лук)", GUILayout.Height(30)))
+            CreateSeedBags();
+        if (GUILayout.Button("4. Настроить колодец (тег Water)", GUILayout.Height(30)))
+            SetupWell();
+        EditorGUILayout.Space();
+        if (GUILayout.Button("5. Создать слой PlantBed", GUILayout.Height(30)))
+            CreatePlantBedLayer();
+        if (GUILayout.Button("5b. Подставить модели Norm в грядки", GUILayout.Height(30)))
+            PlantBedNormModels.AssignNormModelsToPlantBeds();
+        if (GUILayout.Button("5c. Убрать камеры и свет из моделей Norm (FBX)", GUILayout.Height(28)))
+            StripNormCamerasLights.DisableCamerasLightsImportAndReimport();
+        if (GUILayout.Button("6. Настроить систему достижений", GUILayout.Height(30)))
+            SetupAchievements();
+        
+        GUI.backgroundColor = new Color(1f, 0.7f, 0.7f);
+        if (GUILayout.Button("6b. Сбросить достижения", GUILayout.Height(30)))
+            DoResetAchievements();
+        GUI.backgroundColor = Color.white;
         
         EditorGUILayout.Space();
-        GUILayout.Label("Сцена:", EditorStyles.boldLabel);
-        GUI.backgroundColor = new Color(0.6f, 0.85f, 1f);
-        if (GUILayout.Button("💾 Сохранить текущую сцену для автонастройки", GUILayout.Height(28)))
+        GUILayout.Label("Утилиты", EditorStyles.boldLabel);
+        if (GUILayout.Button("Сбросить обучение (PlayerPrefs)"))
         {
-            SaveCurrentSceneForAutosetup();
+            PlayerPrefs.DeleteKey("TutorialCompleted");
+            PlayerPrefs.Save();
+            Debug.Log("[Tutorial Setup] Обучение сброшено!");
+            EditorUtility.DisplayDialog("Успех", "Обучение сброшено!", "OK");
         }
-        GUI.backgroundColor = Color.white;
+        if (GUILayout.Button("Сбросить достижения (PlayerPrefs)"))
+            DoResetAchievements();
+        if (GUILayout.Button("Найти объекты в сцене"))
+            FindObjectsInScene();
+    }
+    
+    private void DoResetAchievements()
+    {
+        if (!EditorUtility.DisplayDialog("Сброс достижений",
+            "Вы уверены, что хотите сбросить все достижения?\n\nЭто удалит все разблокированные достижения и скроет их с экрана.",
+            "Да, сбросить", "Отмена"))
+            return;
+        AchievementManager am = Object.FindObjectOfType<AchievementManager>();
+        if (am != null)
+        {
+            am.ResetAchievements();
+            EditorUtility.DisplayDialog("Готово", "Все достижения сброшены!", "OK");
+        }
+        else
+        {
+            PlayerPrefs.DeleteKey("Achievements");
+            PlayerPrefs.Save();
+            EditorUtility.DisplayDialog("Готово", "Достижения сброшены из PlayerPrefs!\n\n(AchievementManager не найден в сцене)", "OK");
+        }
     }
     
     private void CreateTutorialManager()
@@ -553,6 +627,9 @@ public class TutorialSetupHelper : EditorWindow
         {
             SetupWell();
         }
+
+        // 6. Настраиваем систему достижений
+        SetupAchievements();
         
         EditorUtility.DisplayDialog("Готово!", 
             "Автоматическая настройка завершена!\n\n" +
@@ -639,5 +716,118 @@ public class TutorialSetupHelper : EditorWindow
             "OK");
         
         Repaint();
+    }
+
+    private void SetupAchievements()
+    {
+        // Пути к спрайтам
+        const string SpritesFolder = "Assets/Sprites";
+        string firstCarrotPath = SpritesFolder + "/first_carrot.png";
+        string firstOnionPath = SpritesFolder + "/first_onion.png";
+        string firstPumpkinPath = SpritesFolder + "/first_pumpkin.png";
+        string firstTomatoPath = SpritesFolder + "/first_tomato.png";
+        string gardenMasterPath = SpritesFolder + "/garden_master.png";
+
+        // Загружаем спрайты
+        Sprite firstCarrot = AssetDatabase.LoadAssetAtPath<Sprite>(firstCarrotPath);
+        Sprite firstOnion = AssetDatabase.LoadAssetAtPath<Sprite>(firstOnionPath);
+        Sprite firstPumpkin = AssetDatabase.LoadAssetAtPath<Sprite>(firstPumpkinPath);
+        Sprite firstTomato = AssetDatabase.LoadAssetAtPath<Sprite>(firstTomatoPath);
+        Sprite gardenMaster = AssetDatabase.LoadAssetAtPath<Sprite>(gardenMasterPath);
+
+        // Проверяем наличие спрайтов
+        string missing = "";
+        if (firstCarrot == null) missing += "\n• first_carrot.png";
+        if (firstOnion == null) missing += "\n• first_onion.png";
+        if (firstPumpkin == null) missing += "\n• first_pumpkin.png";
+        if (firstTomato == null) missing += "\n• first_tomato.png";
+        if (gardenMaster == null) missing += "\n• garden_master.png";
+
+        if (!string.IsNullOrEmpty(missing))
+        {
+            EditorUtility.DisplayDialog("Спрайты не найдены",
+                "Не найдены спрайты в " + SpritesFolder + ":" + missing + "\n\nСоздайте AchievementManager вручную.", "OK");
+            return;
+        }
+
+        // Ищем или создаём AchievementManager
+        AchievementManager am = Object.FindObjectOfType<AchievementManager>();
+        GameObject amObj;
+        if (am != null)
+        {
+            amObj = am.gameObject;
+            Debug.Log("[Tutorial Setup] AchievementManager уже существует, обновляем настройки.");
+        }
+        else
+        {
+            amObj = new GameObject("AchievementManager");
+            am = amObj.AddComponent<AchievementManager>();
+            Undo.RegisterCreatedObjectUndo(amObj, "Create AchievementManager");
+        }
+
+        // Назначаем спрайты
+        SerializedObject so = new SerializedObject(am);
+        so.FindProperty("firstCarrotSprite").objectReferenceValue = firstCarrot;
+        so.FindProperty("firstOnionSprite").objectReferenceValue = firstOnion;
+        so.FindProperty("firstPumpkinSprite").objectReferenceValue = firstPumpkin;
+        so.FindProperty("firstTomatoSprite").objectReferenceValue = firstTomato;
+        so.FindProperty("gardenMasterSprite").objectReferenceValue = gardenMaster;
+
+        // Создаём или находим Canvas
+        Canvas canvas = Object.FindObjectOfType<Canvas>();
+        if (canvas == null)
+        {
+            GameObject canvasObj = new GameObject("Canvas");
+            canvas = canvasObj.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvasObj.AddComponent<UnityEngine.UI.CanvasScaler>();
+            canvasObj.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+            Undo.RegisterCreatedObjectUndo(canvasObj, "Create Canvas");
+            Debug.Log("[Tutorial Setup] Canvas создан.");
+        }
+
+        // Создаём или находим AchievementUI
+        AchievementUI achievementUI = Object.FindObjectOfType<AchievementUI>();
+        GameObject uiObj;
+        if (achievementUI != null)
+        {
+            uiObj = achievementUI.gameObject;
+            Debug.Log("[Tutorial Setup] AchievementUI уже существует, обновляем настройки.");
+        }
+        else
+        {
+            uiObj = new GameObject("AchievementUI");
+            uiObj.transform.SetParent(canvas.transform, false);
+            achievementUI = uiObj.AddComponent<AchievementUI>();
+            Undo.RegisterCreatedObjectUndo(uiObj, "Create AchievementUI");
+        }
+
+        // Настраиваем RectTransform для правого верхнего угла
+        RectTransform uiRect = uiObj.GetComponent<RectTransform>();
+        if (uiRect == null)
+            uiRect = uiObj.AddComponent<RectTransform>();
+
+        uiRect.anchorMin = new Vector2(1f, 1f);
+        uiRect.anchorMax = new Vector2(1f, 1f);
+        uiRect.pivot = new Vector2(1f, 1f);
+        uiRect.anchoredPosition = new Vector2(-20f, -20f);
+        uiRect.sizeDelta = Vector2.zero;
+
+        // Связываем AchievementUI с AchievementManager
+        so.FindProperty("achievementUI").objectReferenceValue = achievementUI;
+        so.ApplyModifiedProperties();
+
+        EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+        Selection.activeGameObject = amObj;
+
+        Debug.Log("[Tutorial Setup] Система достижений настроена!");
+        EditorUtility.DisplayDialog("Готово",
+            "Система достижений настроена!\n\n" +
+            "• AchievementManager создан/обновлён\n" +
+            "• Спрайты назначены\n" +
+            "• AchievementUI создан в правом верхнем углу\n" +
+            "• Компоненты связаны\n\n" +
+            "Достижения будут разблокироваться при первом сборе каждого овоща.",
+            "OK");
     }
 }

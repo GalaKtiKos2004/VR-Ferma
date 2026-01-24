@@ -8,7 +8,7 @@ using TMPro;
 /// </summary>
 public class SimpleFarmSetup : EditorWindow
 {
-    [MenuItem("Ферма/Создать простую ферму")]
+    [MenuItem("VR-Ferma/Создать простую ферму")]
     public static void SetupSimpleFarm()
     {
         if (EditorUtility.DisplayDialog("Создать простую ферму?",
@@ -834,7 +834,7 @@ public class SimpleFarmSetup : EditorWindow
         }
     }
     
-    [MenuItem("Ферма/Очистить сцену")]
+    [MenuItem("VR-Ferma/Очистить сцену")]
     public static void ClearFarm()
     {
         if (EditorUtility.DisplayDialog("Очистить сцену?",

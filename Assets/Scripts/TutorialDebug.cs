@@ -179,32 +179,7 @@ public class TutorialDebug : MonoBehaviour
         }
     }
     
-    private void OnGUI()
-    {
-        if (!enableDebugKeys) return;
-        
-        // Простой UI в углу экрана
-        GUIStyle style = new GUIStyle(GUI.skin.box);
-        style.alignment = TextAnchor.UpperLeft;
-        style.fontSize = 12;
-        style.normal.textColor = Color.white;
-        
-        string info = "";
-        if (TutorialManager.Instance != null)
-        {
-            int step = TutorialManager.Instance.GetCurrentStep();
-            info = $"Tutorial Step: {step} - {GetStepName(step)}\n";
-            info += $"Active: {TutorialManager.Instance.IsTutorialActive()}\n";
-            info += $"\nDebug Keys:\n";
-            info += $"{resetTutorialKey} - Reset\n";
-            info += $"{skipStepKey} - Skip Step\n";
-            info += $"{showInfoKey} - Info";
-        }
-        else
-        {
-            info = "TutorialManager not found";
-        }
-        
-        GUI.Box(new Rect(10, 10, 250, 150), info, style);
-    }
+    // Оверлей «Tutorial Step / Debug Keys» в левом верхнем углу убран.
+    // Клавиши R / N / I по-прежнему работают (сброс, пропуск шага, вывод в лог).
+    private void OnGUI() { }
 }

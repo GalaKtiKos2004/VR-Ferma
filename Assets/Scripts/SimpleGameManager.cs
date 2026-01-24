@@ -13,6 +13,8 @@ public class SimpleGameManager : MonoBehaviour
     [SerializeField] private int coins = 0;
     [SerializeField] private int carrots = 0;
     [SerializeField] private int tomatoes = 0;
+    [SerializeField] private int pumpkins = 0;
+    [SerializeField] private int onions = 0;
     [SerializeField] private int eggs = 0;
     
     [Header("UI")]
@@ -73,6 +75,22 @@ public class SimpleGameManager : MonoBehaviour
         UpdateUI();
         ShowHint($"Собрано помидоров: +{amount}! Монет: +{15 * amount}");
     }
+
+    public void AddPumpkin(int amount = 1)
+    {
+        pumpkins += amount;
+        coins += 12 * amount;
+        UpdateUI();
+        ShowHint($"Собрано тыкв: +{amount}! Монет: +{12 * amount}");
+    }
+
+    public void AddOnion(int amount = 1)
+    {
+        onions += amount;
+        coins += 8 * amount;
+        UpdateUI();
+        ShowHint($"Собран лук: +{amount}! Монет: +{8 * amount}");
+    }
     
     public void AddEgg(int amount = 1)
     {
@@ -119,34 +137,34 @@ public class SimpleGameManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Показать «Шаг N пройден», следующий шаг; окно скрывается через 10 секунд
+    /// Показать «Шаг N пройден», следующий шаг; окно скрывается через 5 секунд
     /// </summary>
     public void ShowTutorialStepCompleted(int completedStep, string nextStepName)
     {
-        hintTutorialLockUntil = Time.time + 10f;
+        hintTutorialLockUntil = Time.time + 5f;
         string msg = $"✓ Шаг {completedStep} пройден!\nСледующий шаг: {nextStepName}";
         if (hintText != null)
         {
             hintText.gameObject.SetActive(true);
             hintText.text = msg;
             CancelInvoke(nameof(ClearHint));
-            Invoke(nameof(ClearHint), 10f);
+            Invoke(nameof(ClearHint), 5f);
         }
         Debug.Log($"[Подсказка] {msg}");
     }
     
     /// <summary>
-    /// Показать завершение обучения; окно скрывается через 10 секунд
+    /// Показать завершение обучения; окно скрывается через 5 секунд
     /// </summary>
     public void ShowTutorialFinished(string message)
     {
-        hintTutorialLockUntil = Time.time + 10f;
+        hintTutorialLockUntil = Time.time + 5f;
         if (hintText != null)
         {
             hintText.gameObject.SetActive(true);
             hintText.text = message;
             CancelInvoke(nameof(ClearHint));
-            Invoke(nameof(ClearHint), 10f);
+            Invoke(nameof(ClearHint), 5f);
         }
         Debug.Log($"[Подсказка] {message}");
     }
