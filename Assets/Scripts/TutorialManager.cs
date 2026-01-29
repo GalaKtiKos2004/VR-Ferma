@@ -27,6 +27,10 @@ public class TutorialManager : MonoBehaviour
     [SerializeField] private GameObject wateringCan; // Лейка
     [SerializeField] private GameObject well; // Колодец
     
+    [Header("Этап 2: Животные")]
+    [SerializeField] private GameObject foodBucket; // Ведро с зерном
+    [SerializeField] private Animal tutorialAnimal; // Обучающее животное (любая курица)
+    
     [Header("Подсветка")]
     [SerializeField] private Color highlightColor = new Color(1f, 1f, 0f, 0.5f);
     [SerializeField] private float pulseSpeed = 2f;
@@ -34,7 +38,7 @@ public class TutorialManager : MonoBehaviour
     private int currentStep = 0;
     private Dictionary<GameObject, TutorialHighlight> highlights = new Dictionary<GameObject, TutorialHighlight>();
     
-    // Флаги: тяпка → взрыхлить тяпкой → грабли → разрыхлить граблями → семена → посадка → лейка → наполнить → полив → сбор
+    // Флаги: тяпка → взрыхлить тяпкой → грабли → разрыхлить граблями → семена → посадка → лейка → наполнить → полив → сбор → животные
     private bool hoeTaken = false;
     private bool bedTilled = false;
     private bool rakeTaken = false;
@@ -45,6 +49,11 @@ public class TutorialManager : MonoBehaviour
     private bool canFilled = false;
     private bool plantWatered = false;
     private bool harvestCollected = false;
+    
+    // Животные
+    private bool foodTaken = false;
+    private bool animalFed = false;
+    private bool animalPet = false;
     
     private void Awake()
     {
@@ -60,6 +69,17 @@ public class TutorialManager : MonoBehaviour
     
     private void Start()
     {
+        // Автопоиск объектов если не назначены
+        if (foodBucket == null)
+            foodBucket = GameObject.Find("FoodBucket");
+        
+        if (tutorialAnimal == null)
+        {
+            Animal[] animals = FindObjectsOfType<Animal>();
+            if (animals.Length > 0)
+                tutorialAnimal = animals[0]; // Первое животное (обычно курица)
+        }
+        
         if (tutorialEnabled && !tutorialCompleted)
         {
             InitializeHighlights();
@@ -80,6 +100,10 @@ public class TutorialManager : MonoBehaviour
         AddHighlight(tutorialPlantBed?.gameObject);
         AddHighlight(wateringCan);
         AddHighlight(well);
+        
+        // Животные
+        AddHighlight(foodBucket);
+        AddHighlight(tutorialAnimal?.gameObject);
     }
     
     private void AddHighlight(GameObject obj)
@@ -364,6 +388,101 @@ public class TutorialManager : MonoBehaviour
         harvestCollected = true;
         Debug.Log("[Tutorial] Урожай собран!");
         UnhighlightObject(tutorialPlantBed?.gameObject);
+        
+        if (SimpleGameManager.Instance != null)
+            SimpleGameManager.Instance.ShowTutorialStepCompleted(10, "Покормить животное");
+        
+        StartCoroutine(WaitAndStartStep11());
+    }
+    
+    private IEnumerator WaitAndStartStep11()
+    {
+        yield return new WaitForSeconds(5f);
+        StartStep11_TakeFood();
+    }
+    
+    // ========== 11. Взять зерно ==========
+    private void StartStep11_TakeFood()
+    {
+        currentStep = 11;
+        Debug.Log("[Tutorial] Этап 11: Взять зерно из ведра");
+        HighlightObject(foodBucket);
+        if (SimpleGameManager.Instance != null)
+            SimpleGameManager.Instance.ShowHint("Подойдите к ведру с зерном и нажмите E, чтобы взять зерно! 🌾", 10f);
+    }
+    
+    public void OnFoodTaken()
+    {
+        if (currentStep != 11 || foodTaken) return;
+        foodTaken = true;
+        Debug.Log("[Tutorial] Зерно взято!");
+        UnhighlightObject(foodBucket);
+        
+        if (SimpleGameManager.Instance != null)
+            SimpleGameManager.Instance.ShowTutorialStepCompleted(11, "Покормить животное");
+        
+        StartCoroutine(WaitAndStartStep12());
+    }
+    
+    private IEnumerator WaitAndStartStep12()
+    {
+        yield return new WaitForSeconds(3f);
+        StartStep12_FeedAnimal();
+    }
+    
+    // ========== 12. Покормить животное ==========
+    private void StartStep12_FeedAnimal()
+    {
+        currentStep = 12;
+        Debug.Log("[Tutorial] Этап 12: Покормить животное");
+        
+        // Находим ближайшее животное если не назначено
+        if (tutorialAnimal == null)
+        {
+            Animal[] animals = FindObjectsOfType<Animal>();
+            if (animals.Length > 0)
+                tutorialAnimal = animals[0];
+        }
+        
+        HighlightObject(tutorialAnimal?.gameObject);
+        if (SimpleGameManager.Instance != null)
+            SimpleGameManager.Instance.ShowHint("Подойдите к животному и нажмите E, чтобы покормить! 🐔", 10f);
+    }
+    
+    public void OnAnimalFed()
+    {
+        if (currentStep != 12 || animalFed) return;
+        animalFed = true;
+        Debug.Log("[Tutorial] Животное покормлено!");
+        
+        if (SimpleGameManager.Instance != null)
+            SimpleGameManager.Instance.ShowTutorialStepCompleted(12, "Погладить животное");
+        
+        StartCoroutine(WaitAndStartStep13());
+    }
+    
+    private IEnumerator WaitAndStartStep13()
+    {
+        yield return new WaitForSeconds(3f);
+        StartStep13_PetAnimal();
+    }
+    
+    // ========== 13. Погладить животное ==========
+    private void StartStep13_PetAnimal()
+    {
+        currentStep = 13;
+        Debug.Log("[Tutorial] Этап 13: Погладить животное");
+        HighlightObject(tutorialAnimal?.gameObject);
+        if (SimpleGameManager.Instance != null)
+            SimpleGameManager.Instance.ShowHint("Теперь погладьте животное (E без зерна)! ❤️", 10f);
+    }
+    
+    public void OnAnimalPet()
+    {
+        if (currentStep != 13 || animalPet) return;
+        animalPet = true;
+        Debug.Log("[Tutorial] Животное поглажено!");
+        UnhighlightObject(tutorialAnimal?.gameObject);
         CompleteTutorial();
     }
     
@@ -371,7 +490,7 @@ public class TutorialManager : MonoBehaviour
     {
         tutorialCompleted = true;
         if (SimpleGameManager.Instance != null)
-            SimpleGameManager.Instance.ShowTutorialFinished("✓ Шаг 10 пройден!\n🎉 Поздравляем! Вы вырастили первую морковку! Достижение: «Первый урожай!»");
+            SimpleGameManager.Instance.ShowTutorialFinished("✓ Обучение завершено!\n🎉 Вы научились выращивать растения и ухаживать за животными!");
         Debug.Log("[Tutorial] Обучение завершено!");
         PlayerPrefs.SetInt("TutorialCompleted", 1);
         PlayerPrefs.Save();
@@ -406,6 +525,9 @@ public class TutorialManager : MonoBehaviour
             case 8: return "Наполнить лейку";
             case 9: return "Полить росток";
             case 10: return "Собрать урожай";
+            case 11: return "Взять зерно из ведра";
+            case 12: return "Покормить животное";
+            case 13: return "Погладить животное";
             default: return "";
         }
     }

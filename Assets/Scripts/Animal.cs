@@ -20,6 +20,11 @@ public class Animal : MonoBehaviour
     [SerializeField] private GameObject hungryEffect; // Эффект когда голодное
     [SerializeField] private Animator animator;
     
+    /// <summary> Параметры аниматора: IsWalking (bool), IsHungry (bool), Eat (trigger), Happy (trigger) </summary>
+    private static readonly int ParamIsHungry = Animator.StringToHash("IsHungry");
+    private static readonly int ParamEat = Animator.StringToHash("Eat");
+    private static readonly int ParamHappy = Animator.StringToHash("Happy");
+    
     [Header("Звуки")]
     [SerializeField] private AudioClip happySound;
     [SerializeField] private AudioClip hungrySound;
@@ -33,6 +38,7 @@ public class Animal : MonoBehaviour
     
     private bool isHungry = false;
     private float lastInteractionTime = 0f;
+    private float debugTimer = 0f;
     
     private void Start()
     {
@@ -42,10 +48,70 @@ public class Animal : MonoBehaviour
             audioSource = gameObject.AddComponent<AudioSource>();
         }
         
-        // Ускоряем анимацию животного
-        if (animator != null)
+        // Ищем Animator на себе или в детях (модели из FBX часто в дочерних объектах)
+        // Для Generic рига Animator ДОЛЖЕН быть на GameObject с костями
+        if (animator == null)
         {
-            animator.speed = 1.5f; // В 1.5 раза быстрее
+            animator = GetComponentInChildren<Animator>();
+            
+            // Если не нашли, ищем на первом child с детьми (обычно это rig root)
+            if (animator == null)
+            {
+                foreach (Transform child in transform)
+                {
+                    var childAnim = child.GetComponent<Animator>();
+                    if (childAnim != null)
+                    {
+                        animator = childAnim;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Диагностика Animator
+        if (animator == null)
+        {
+            Debug.LogError($"❌ {name}: Animator НЕ НАЙДЕН! Запустите VR-Ferma → Обновить Animator");
+        }
+        else
+        {
+            Debug.Log($"[Animal.Start] {name}: Animator найден на {animator.gameObject.name}");
+            Debug.Log($"  - Путь: {GetGameObjectPath(animator.gameObject)}");
+            Debug.Log($"  - Controller: {(animator.runtimeAnimatorController != null ? animator.runtimeAnimatorController.name : "НЕТ ❌")}");
+            Debug.Log($"  - Avatar: {(animator.avatar != null ? animator.avatar.name : "НЕТ ❌")}");
+            Debug.Log($"  - Enabled: {animator.enabled}");
+            Debug.Log($"  - IsInitialized: {animator.isInitialized}");
+            
+            if (animator.runtimeAnimatorController != null)
+            {
+                animator.speed = 1.5f;
+                animator.Rebind(); // Rebind в Start для применения контроллера
+                animator.Update(0);
+                
+                // Проверяем параметры
+                Debug.Log($"  - Rebind выполнен, speed = {animator.speed}");
+                Debug.Log($"  - Параметры контроллера:");
+                foreach (var param in animator.parameters)
+                {
+                    Debug.Log($"    • {param.name} ({param.type})");
+                }
+                
+                // Проверяем children (кости)
+                int childCount = animator.transform.childCount;
+                Debug.Log($"  - Children на Animator GO: {childCount}");
+                if (childCount > 0)
+                {
+                    string childNames = "";
+                    for (int i = 0; i < Mathf.Min(5, childCount); i++)
+                        childNames += animator.transform.GetChild(i).name + ", ";
+                    Debug.Log($"    Первые дети: {childNames}...");
+                }
+            }
+            else
+            {
+                Debug.LogError($"❌ {name}: У Animator нет контроллера!");
+            }
         }
         
         UpdateEffects();
@@ -70,7 +136,27 @@ public class Animal : MonoBehaviour
             OnBecomeHappy();
         }
         
+        // Переключаем анимацию по состоянию (голоден / доволен)
+        UpdateAnimationState();
         UpdateEffects();
+        
+        // Отладка анимации каждые 3 секунды
+        debugTimer += Time.deltaTime;
+        if (debugTimer >= 3f)
+        {
+            debugTimer = 0f;
+            if (animator != null && animator.runtimeAnimatorController != null && animator.isInitialized)
+            {
+                var state = animator.GetCurrentAnimatorStateInfo(0);
+                int hash = state.shortNameHash;
+                string stateName = hash == Animator.StringToHash("Idle") ? "Idle" :
+                                   hash == Animator.StringToHash("Walk") ? "Walk" :
+                                   hash == Animator.StringToHash("HungryIdle") ? "HungryIdle" :
+                                   hash == Animator.StringToHash("Eat") ? "Eat" :
+                                   hash == Animator.StringToHash("Happy") ? "Happy" : hash.ToString();
+                Debug.Log($"[Anim] {name}: State={stateName}, NormalizedTime={state.normalizedTime:F2}, IsHungry={isHungry}, Speed={animator.speed}");
+            }
+        }
         
         // Производство продукции
         if (canProduce && !isHungry)
@@ -100,13 +186,43 @@ public class Animal : MonoBehaviour
             audioSource.PlayOneShot(eatSound);
         }
         
-        if (animator != null)
+        // Анимация кормления
+        if (animator == null)
+            animator = GetComponentInChildren<Animator>();
+        
+        if (animator != null && animator.runtimeAnimatorController != null)
         {
-            animator.SetTrigger("Eat");
+            // Проверяем инициализацию
+            if (!animator.isInitialized)
+            {
+                animator.Rebind();
+                animator.Update(0);
+                Debug.Log($"[Feed] {name}: Animator переинициализирован");
+            }
+            
+            // Устанавливаем триггер
+            animator.SetTrigger(ParamEat);
+            animator.Update(0); // Принудительное обновление для применения триггера
+            
+            Debug.Log($"[Feed] {name}: триггер Eat установлен, isInitialized={animator.isInitialized}");
+            
+            // Проверяем состояние через 0.1 сек
+            if (Application.isPlaying)
+                StartCoroutine(CheckAnimationStateAfterDelay("Eat", 0.1f));
+        }
+        else
+        {
+            Debug.LogError($"[Feed] {name}: НЕТ ANIMATOR или CONTROLLER! Animator={animator != null}, Controller={animator?.runtimeAnimatorController != null}");
         }
         
         Debug.Log($"{animalName} покормлено! Счастье: {currentHappiness:F0}/{maxHappiness}");
         lastInteractionTime = Time.time;
+        
+        // Уведомляем TutorialManager
+        if (TutorialManager.Instance != null)
+        {
+            TutorialManager.Instance.OnAnimalFed();
+        }
     }
     
     /// <summary>
@@ -117,6 +233,7 @@ public class Animal : MonoBehaviour
         // Не даем спамить поглаживания
         if (Time.time - lastInteractionTime < 2f)
         {
+            Debug.Log($"[Pet] {name}: слишком рано (cooldown)");
             return;
         }
         
@@ -131,9 +248,33 @@ public class Animal : MonoBehaviour
             audioSource.PlayOneShot(happySound);
         }
         
-        if (animator != null)
+        // Анимация поглаживания
+        if (animator == null)
+            animator = GetComponentInChildren<Animator>();
+        
+        if (animator != null && animator.runtimeAnimatorController != null)
         {
-            animator.SetTrigger("Happy");
+            // Проверяем инициализацию
+            if (!animator.isInitialized)
+            {
+                animator.Rebind();
+                animator.Update(0);
+                Debug.Log($"[Pet] {name}: Animator переинициализирован");
+            }
+            
+            // Устанавливаем триггер
+            animator.SetTrigger(ParamHappy);
+            animator.Update(0); // Принудительное обновление для применения триггера
+            
+            Debug.Log($"[Pet] {name}: триггер Happy установлен, isInitialized={animator.isInitialized}");
+            
+            // Проверяем состояние через 0.1 сек
+            if (Application.isPlaying)
+                StartCoroutine(CheckAnimationStateAfterDelay("Happy", 0.1f));
+        }
+        else
+        {
+            Debug.LogError($"[Pet] {name}: НЕТ ANIMATOR или CONTROLLER! Animator={animator != null}, Controller={animator?.runtimeAnimatorController != null}");
         }
         
         // Показываем сердечки
@@ -145,6 +286,12 @@ public class Animal : MonoBehaviour
         
         Debug.Log($"{animalName} погладили! Счастье: {currentHappiness:F0}/{maxHappiness}");
         lastInteractionTime = Time.time;
+        
+        // Уведомляем TutorialManager
+        if (TutorialManager.Instance != null)
+        {
+            TutorialManager.Instance.OnAnimalPet();
+        }
     }
     
     /// <summary>
@@ -185,6 +332,15 @@ public class Animal : MonoBehaviour
     /// <summary>
     /// Обновить визуальные эффекты
     /// </summary>
+    /// <summary>
+    /// Обновить параметры аниматора в зависимости от состояния.
+    /// </summary>
+    private void UpdateAnimationState()
+    {
+        if (animator == null || animator.runtimeAnimatorController == null) return;
+        animator.SetBool(ParamIsHungry, isHungry);
+    }
+    
     private void UpdateEffects()
     {
         if (happyEffect != null)
@@ -196,6 +352,55 @@ public class Animal : MonoBehaviour
         {
             hungryEffect.SetActive(isHungry);
         }
+    }
+    
+    /// <summary> Установить ссылку на Animator (например, из Editor при создании животного). </summary>
+    public void SetAnimator(Animator a)
+    {
+        animator = a;
+    }
+    
+    /// <summary>
+    /// Проверить состояние анимации через задержку (для отладки триггеров)
+    /// </summary>
+    private System.Collections.IEnumerator CheckAnimationStateAfterDelay(string expectedState, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        
+        if (animator != null && animator.isInitialized && animator.layerCount > 0)
+        {
+            var state = animator.GetCurrentAnimatorStateInfo(0);
+            int hash = state.shortNameHash;
+            string stateName = hash == Animator.StringToHash("Idle") ? "Idle" :
+                               hash == Animator.StringToHash("Walk") ? "Walk" :
+                               hash == Animator.StringToHash("HungryIdle") ? "HungryIdle" :
+                               hash == Animator.StringToHash("Eat") ? "Eat" :
+                               hash == Animator.StringToHash("Happy") ? "Happy" : hash.ToString();
+            
+            if (stateName == expectedState)
+                Debug.Log($"[AnimCheck] {name}: ✓ Анимация {expectedState} играет! NormalizedTime={state.normalizedTime:F2}");
+            else
+                Debug.LogWarning($"[AnimCheck] {name}: ❌ Ожидали {expectedState}, но играет {stateName}");
+        }
+        else
+        {
+            Debug.LogError($"[AnimCheck] {name}: Animator не инициализирован!");
+        }
+    }
+    
+    /// <summary>
+    /// Получить полный путь GameObject в иерархии
+    /// </summary>
+    private string GetGameObjectPath(GameObject obj)
+    {
+        string path = obj.name;
+        Transform current = obj.transform.parent;
+        while (current != null)
+        {
+            path = current.name + "/" + path;
+            current = current.parent;
+        }
+        return path;
     }
     
     public bool IsHungry() => isHungry;

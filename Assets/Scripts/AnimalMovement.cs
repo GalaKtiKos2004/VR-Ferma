@@ -23,10 +23,29 @@ public class AnimalMovement : MonoBehaviour
     private float waitTimer = 0f;
     private float currentWaitTime = 0f;
     private Animator animator;
+    private Rigidbody rb;
+    
+    private static readonly int ParamIsWalking = Animator.StringToHash("IsWalking");
     
     private void Start()
     {
         animator = GetComponent<Animator>();
+        if (animator == null)
+            animator = GetComponentInChildren<Animator>();
+        
+        rb = GetComponent<Rigidbody>();
+        if (rb == null)
+        {
+            rb = gameObject.AddComponent<Rigidbody>();
+            rb.mass = 10f;
+            rb.drag = 5f;
+            rb.angularDrag = 5f;
+            rb.useGravity = true;
+            rb.isKinematic = false;
+            rb.interpolation = RigidbodyInterpolation.Interpolate;
+            rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+            rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+        }
         
         // Устанавливаем центр зоны как текущую позицию
         if (centerPoint == Vector3.zero)
@@ -57,6 +76,8 @@ public class AnimalMovement : MonoBehaviour
     /// </summary>
     private void MoveToTarget()
     {
+        if (rb == null) return;
+        
         // Направление к цели
         Vector3 direction = (targetPosition - transform.position).normalized;
         direction.y = 0; // Движение только по горизонтали
@@ -74,21 +95,22 @@ public class AnimalMovement : MonoBehaviour
             return;
         }
         
-        // Двигаемся
-        transform.position += direction * moveSpeed * Time.deltaTime;
+        // Двигаемся через Rigidbody для корректной физики столкновений
+        Vector3 newPosition = rb.position + direction * moveSpeed * Time.deltaTime;
+        newPosition.y = rb.position.y; // Сохраняем высоту
+        rb.MovePosition(newPosition);
         
-        // Поворачиваемся
+        // Поворачиваемся через Rigidbody
         if (direction != Vector3.zero)
         {
             Quaternion targetRotation = Quaternion.LookRotation(direction);
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+            Quaternion newRotation = Quaternion.Slerp(rb.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+            rb.MoveRotation(newRotation);
         }
         
-        // Анимация ходьбы
-        if (animator != null)
-        {
-            animator.SetBool("IsWalking", true);
-        }
+        // Анимация ходьбы (только если есть контроллер)
+        if (animator != null && animator.runtimeAnimatorController != null)
+            animator.SetBool(ParamIsWalking, true);
     }
     
     /// <summary>
@@ -105,11 +127,9 @@ public class AnimalMovement : MonoBehaviour
             isMoving = true;
         }
         
-        // Анимация стояния
-        if (animator != null)
-        {
-            animator.SetBool("IsWalking", false);
-        }
+        // Анимация стояния (только если есть контроллер)
+        if (animator != null && animator.runtimeAnimatorController != null)
+            animator.SetBool(ParamIsWalking, false);
     }
     
     /// <summary>
@@ -145,10 +165,8 @@ public class AnimalMovement : MonoBehaviour
         canMove = false;
         isMoving = false;
         
-        if (animator != null)
-        {
-            animator.SetBool("IsWalking", false);
-        }
+        if (animator != null && animator.runtimeAnimatorController != null)
+            animator.SetBool(ParamIsWalking, false);
     }
     
     /// <summary>

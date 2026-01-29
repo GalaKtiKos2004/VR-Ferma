@@ -25,6 +25,10 @@ public class FeedingTrough : MonoBehaviour
     [SerializeField] private float feedingRange = 2f;
     [SerializeField] private LayerMask animalLayer;
     
+    [Header("Отладка")]
+    [SerializeField] private bool showDebug = false;
+    private float debugTimer = 0f;
+    
     private void Start()
     {
         audioSource = GetComponent<AudioSource>();
@@ -34,6 +38,8 @@ public class FeedingTrough : MonoBehaviour
         }
         
         UpdateVisuals();
+        
+        Debug.Log($"[FeedingTrough] {name}: foodAmount={foodAmount}/{maxFood}, feedingRange={feedingRange}m, animalLayer={animalLayer.value}");
     }
     
     private void Update()
@@ -42,6 +48,33 @@ public class FeedingTrough : MonoBehaviour
         if (foodAmount > 0)
         {
             FeedNearbyAnimals();
+        }
+        
+        // Отладка каждые 5 секунд
+        if (showDebug)
+        {
+            debugTimer += Time.deltaTime;
+            if (debugTimer >= 5f)
+            {
+                debugTimer = 0f;
+                Debug.Log($"[FeedingTrough] {name}: foodAmount={foodAmount:F0}/{maxFood}, range={feedingRange}m");
+                
+                // Показываем ближайших животных
+                Collider[] nearbyColliders = Physics.OverlapSphere(transform.position, feedingRange * 2f); // x2 для диагностики
+                int animalCount = 0;
+                foreach (var col in nearbyColliders)
+                {
+                    Animal a = col.GetComponent<Animal>();
+                    if (a != null)
+                    {
+                        float dist = Vector3.Distance(transform.position, a.transform.position);
+                        Debug.Log($"  - {a.name}: расстояние={dist:F1}м, голоден={a.IsHungry()}, слой={LayerMask.LayerToName(a.gameObject.layer)}");
+                        animalCount++;
+                    }
+                }
+                if (animalCount == 0)
+                    Debug.Log($"  - Животных рядом нет в радиусе {feedingRange * 2f}м");
+            }
         }
     }
     
@@ -99,14 +132,28 @@ public class FeedingTrough : MonoBehaviour
     {
         Collider[] nearbyColliders = Physics.OverlapSphere(transform.position, feedingRange, animalLayer);
         
+        if (showDebug && nearbyColliders.Length > 0)
+            Debug.Log($"[FeedNearbyAnimals] {name}: найдено {nearbyColliders.Length} коллайдеров в радиусе {feedingRange}м");
+        
         foreach (Collider col in nearbyColliders)
         {
             Animal animal = col.GetComponent<Animal>();
-            if (animal != null && animal.IsHungry())
+            if (animal != null)
             {
-                if (TakeFood(10f))
+                if (showDebug)
+                    Debug.Log($"  - {animal.name}: IsHungry={animal.IsHungry()}");
+                
+                if (animal.IsHungry())
                 {
-                    animal.Feed();
+                    if (TakeFood(10f))
+                    {
+                        animal.Feed();
+                        Debug.Log($"[FeedingTrough] {name}: покормил {animal.name}, осталось еды {foodAmount:F0}");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[FeedingTrough] {name}: нет еды для {animal.name}!");
+                    }
                 }
             }
         }

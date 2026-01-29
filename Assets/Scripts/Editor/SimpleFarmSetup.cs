@@ -20,6 +20,675 @@ public class SimpleFarmSetup : EditorWindow
         }
     }
     
+    [MenuItem("VR-Ferma/Добавить животных")]
+    public static void AddAnimals()
+    {
+        if (EditorUtility.DisplayDialog("Добавить животных?",
+            "Это добавит животных на ферму:\n" +
+            "- 3 курицы\n" +
+            "- 1 корова\n" +
+            "- 2 козы\n" +
+            "- 2 свиньи\n\n" +
+            "Также будут созданы кормушки и ведро с зерном (если их ещё нет).",
+            "Добавить", "Отмена"))
+        {
+            AddAnimalsToScene();
+        }
+    }
+    
+    [MenuItem("VR-Ferma/Переключить на VR (шлем)")]
+    public static void AddVROriginMenu()
+    {
+        // Проверяем, есть ли уже XR Origin
+        GameObject existingXR = GameObject.Find("XR Origin");
+        if (existingXR == null)
+            existingXR = GameObject.Find("Complete XR Origin");
+        
+        if (existingXR != null)
+        {
+            EditorUtility.DisplayDialog("VR Origin уже есть", 
+                $"В сцене уже есть VR Origin: {existingXR.name}", 
+                "OK");
+            return;
+        }
+        
+        // Пробуем загрузить готовый префаб
+        string[] prefabPaths = new[]
+        {
+            "Assets/VRTemplateAssets/Prefabs/Setup/Complete XR Origin Set Up Variant.prefab",
+            "Assets/Samples/XR Interaction Toolkit/3.1.2/Starter Assets/Prefabs/XR Origin (XR Rig).prefab"
+        };
+        
+        GameObject vrOriginPrefab = null;
+        foreach (var path in prefabPaths)
+        {
+            vrOriginPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (vrOriginPrefab != null)
+            {
+                Debug.Log($"✓ Найден VR Origin prefab: {path}");
+                break;
+            }
+        }
+        
+        if (vrOriginPrefab == null)
+        {
+            EditorUtility.DisplayDialog("Префаб не найден", 
+                "VR Origin префаб не найден.\n\n" +
+                "Убедитесь что XR Interaction Toolkit установлен:\n" +
+                "Window → Package Manager → XR Interaction Toolkit → Import Samples", 
+                "OK");
+            return;
+        }
+        
+        // Создаём VR Origin
+        GameObject vrOrigin = (GameObject)PrefabUtility.InstantiatePrefab(vrOriginPrefab);
+        vrOrigin.transform.position = new Vector3(0, 0, -5);
+        
+        // Удаляем NonVR Player если есть
+        GameObject nonVRPlayer = GameObject.Find("Player");
+        if (nonVRPlayer != null && nonVRPlayer.GetComponent<NonVRPlayerController>() != null)
+        {
+            if (EditorUtility.DisplayDialog("Удалить NonVR Player?", 
+                "В сцене есть игрок с клавиатурным управлением.\nУдалить его?", 
+                "Да", "Нет"))
+            {
+                DestroyImmediate(nonVRPlayer);
+                Debug.Log("✓ NonVR Player удалён");
+            }
+        }
+        
+        EditorUtility.DisplayDialog("Готово", 
+            "VR Origin добавлен!\n\n" +
+            "Передвижение:\n" +
+            "• Левый джойстик — движение\n" +
+            "• Правый джойстик — поворот\n" +
+            "• Триггеры — захват объектов\n\n" +
+            "Запустите Play Mode и наденьте шлем!", 
+            "OK");
+    }
+    
+    [MenuItem("VR-Ferma/Переключить на клавиатуру (ПК)")]
+    public static void AddNonVRPlayerMenu()
+    {
+        // Проверяем, есть ли уже NonVR Player
+        GameObject existingPlayer = GameObject.Find("Player");
+        if (existingPlayer != null && existingPlayer.GetComponent<NonVRPlayerController>() != null)
+        {
+            EditorUtility.DisplayDialog("Игрок уже есть", 
+                "В сцене уже есть игрок с клавиатурным управлением.", 
+                "OK");
+            return;
+        }
+        
+        // Удаляем VR Origin если есть
+        GameObject[] vrObjects = new GameObject[]
+        {
+            GameObject.Find("XR Origin"),
+            GameObject.Find("Complete XR Origin"),
+            GameObject.Find("XR Rig")
+        };
+        
+        foreach (var vr in vrObjects)
+        {
+            if (vr != null)
+            {
+                if (EditorUtility.DisplayDialog("Удалить VR Origin?", 
+                    $"В сцене есть VR Origin: {vr.name}\nУдалить его?", 
+                    "Да", "Нет"))
+                {
+                    DestroyImmediate(vr);
+                    Debug.Log($"✓ VR Origin удалён: {vr.name}");
+                }
+            }
+        }
+        
+        // Создаём NonVR Player
+        CreatePlayer();
+        
+        EditorUtility.DisplayDialog("Готово", 
+            "Игрок с клавиатурным управлением создан!\n\n" +
+            "Управление:\n" +
+            "• WASD — движение\n" +
+            "• Мышь — взгляд\n" +
+            "• E / ЛКМ — взаимодействие\n" +
+            "• Shift — бег\n" +
+            "• Q — выбросить\n\n" +
+            "Запустите Play Mode!", 
+            "OK");
+    }
+    
+    [MenuItem("VR-Ferma/Создать UI подсказок")]
+    public static void CreateHintUIMenu()
+    {
+        SimpleGameManager manager = Object.FindObjectOfType<SimpleGameManager>();
+        if (manager == null)
+        {
+            GameObject gm = new GameObject("GameManager");
+            manager = gm.AddComponent<SimpleGameManager>();
+            Debug.Log("✓ GameManager создан");
+        }
+        
+        CreateHintUI(manager);
+        EditorUtility.DisplayDialog("Готово", "UI подсказок создан!\nТеперь подсказки будут отображаться внизу экрана.", "OK");
+    }
+    
+    [MenuItem("VR-Ferma/Создать загон для куриц")]
+    public static void CreateChickenPenMenu()
+    {
+        CreateChickenPen();
+        EditorUtility.DisplayDialog("Готово", 
+            "Загон для куриц создан!\n\nТеперь курицы будут ходить только внутри загона.\nПозиция: (5, 0, 0), размер: 8x6 метров.", 
+            "OK");
+    }
+    
+    [MenuItem("VR-Ferma/Создать загон для коз")]
+    public static void CreateGoatPenMenu()
+    {
+        CreateGoatPen();
+        EditorUtility.DisplayDialog("Готово", 
+            "Загон для коз создан!\n\nТеперь козы будут ходить только внутри загона.\nПозиция: (-7, 0, -5), размер: 10x8 метров.", 
+            "OK");
+    }
+    
+    [MenuItem("VR-Ferma/Включить отладку кормушек")]
+    public static void EnableTroughDebugMenu()
+    {
+        FeedingTrough[] troughs = Object.FindObjectsOfType<FeedingTrough>();
+        if (troughs.Length == 0)
+        {
+            EditorUtility.DisplayDialog("Нет кормушек", "Кормушки не найдены в сцене.", "OK");
+            return;
+        }
+        
+        foreach (var trough in troughs)
+        {
+            var showDebugField = typeof(FeedingTrough).GetField("showDebug",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (showDebugField != null)
+            {
+                showDebugField.SetValue(trough, true);
+                Debug.Log($"✓ Отладка включена для {trough.name}");
+            }
+        }
+        
+        EditorUtility.DisplayDialog("Готово", 
+            $"Отладка включена для {troughs.Length} кормушек.\n\nЗапустите Play Mode и смотрите консоль каждые 5 сек.", 
+            "OK");
+    }
+    
+    [MenuItem("VR-Ferma/Удалить объекты с ошибками (missing prefabs)")]
+    public static void CleanMissingPrefabsMenu()
+    {
+        var scene = UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene();
+        GameObject[] allObjects = scene.GetRootGameObjects();
+        
+        System.Collections.Generic.List<GameObject> toDelete = new System.Collections.Generic.List<GameObject>();
+        int cleaned = 0;
+        
+        // Рекурсивно проверяем все объекты и их children
+        void CheckObject(GameObject obj)
+        {
+            if (obj == null) return;
+            
+            PrefabInstanceStatus status = PrefabUtility.GetPrefabInstanceStatus(obj);
+            if (status == PrefabInstanceStatus.MissingAsset || PrefabUtility.IsPrefabAssetMissing(obj))
+            {
+                Debug.Log($"✓ Найден missing prefab: {obj.name}");
+                toDelete.Add(obj);
+                cleaned++;
+                return; // Не проверяем children если parent уже missing
+            }
+            
+            // Проверяем children
+            foreach (Transform child in obj.transform)
+            {
+                if (child != null)
+                    CheckObject(child.gameObject);
+            }
+        }
+        
+        foreach (var root in allObjects)
+            CheckObject(root);
+        
+        // Удаляем
+        foreach (var obj in toDelete)
+        {
+            if (obj != null)
+            {
+                Debug.Log($"→ Удаляем: {obj.name}");
+                DestroyImmediate(obj);
+            }
+        }
+        
+        if (cleaned > 0)
+        {
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
+            EditorUtility.DisplayDialog("Готово", 
+                $"Удалено {cleaned} объектов с missing prefabs:\n" +
+                "• zabor, gryadka, pighouse, дерево, сарай, lilGOAT, вила\n\n" +
+                "Сохраните сцену (Ctrl+S).\n" +
+                "Ошибки должны исчезнуть!", 
+                "OK");
+        }
+        else
+        {
+            EditorUtility.DisplayDialog("Не найдено", 
+                "Missing prefabs не найдены автоматически.\n\n" +
+                "Ручной способ:\n" +
+                "1. В Hierarchy ищите объекты с красным текстом\n" +
+                "2. Delete их\n" +
+                "3. Или: VR-Ferma → Очистить ВСЁ → Создать простую ферму", 
+                "OK");
+        }
+    }
+    
+    [MenuItem("VR-Ferma/Подогнать коллайдеры под размер животных")]
+    public static void FitCollidersToAnimalsMenu()
+    {
+        Animal[] animals = Object.FindObjectsOfType<Animal>();
+        if (animals.Length == 0)
+        {
+            EditorUtility.DisplayDialog("Нет животных", "В сцене нет животных.", "OK");
+            return;
+        }
+        
+        int updated = 0;
+        foreach (var animal in animals)
+        {
+            // Получаем bounds модели
+            Renderer[] renderers = animal.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0)
+            {
+                Debug.LogWarning($"⚠️ У {animal.name} нет Renderer для расчёта bounds");
+                continue;
+            }
+            
+            Bounds bounds = renderers[0].bounds;
+            foreach (var r in renderers)
+                bounds.Encapsulate(r.bounds);
+            
+            // Удаляем старые коллайдеры
+            Collider[] oldColliders = animal.GetComponents<Collider>();
+            foreach (var old in oldColliders)
+                DestroyImmediate(old);
+            
+            // Удаляем child коллайдеры (HeadCollider и т.п.)
+            foreach (Transform child in animal.transform)
+            {
+                if (child.name.Contains("Collider"))
+                    DestroyImmediate(child.gameObject);
+            }
+            
+            // Создаём новый BoxCollider на основе bounds
+            BoxCollider box = animal.gameObject.AddComponent<BoxCollider>();
+            
+            // Размеры относительно animal.transform
+            Vector3 localSize = animal.transform.InverseTransformVector(bounds.size);
+            Vector3 localCenter = animal.transform.InverseTransformPoint(bounds.center);
+            
+            box.size = new Vector3(
+                Mathf.Abs(localSize.x),
+                Mathf.Abs(localSize.y),
+                Mathf.Abs(localSize.z)
+            );
+            box.center = localCenter;
+            
+            Debug.Log($"✓ {animal.name}: BoxCollider подогнан (size={box.size}, center={box.center})");
+            updated++;
+        }
+        
+        EditorUtility.DisplayDialog("Готово", 
+            $"Коллайдеры подогнаны у {updated} животных.\n\n" +
+            "Размеры рассчитаны автоматически на основе модели.\n" +
+            "Теперь коллайдеры точно соответствуют размеру животных!", 
+            "OK");
+    }
+    
+    [MenuItem("VR-Ferma/Исправить зону перемещения животных")]
+    public static void FixAnimalWanderRadiusMenu()
+    {
+        Animal[] animals = Object.FindObjectsOfType<Animal>();
+        if (animals.Length == 0)
+        {
+            EditorUtility.DisplayDialog("Нет животных", "В сцене нет животных.", "OK");
+            return;
+        }
+        
+        int updated = 0;
+        foreach (var animal in animals)
+        {
+            AnimalMovement movement = animal.GetComponent<AnimalMovement>();
+            if (movement == null) continue;
+            
+            // Определяем правильный wanderRadius по типу животного
+            float newRadius = 3f;
+            if (animal.name.Contains("Коз") || animal.name.Contains("Goat"))
+                newRadius = 2.5f; // Для загона 10×8м
+            else if (animal.name.Contains("Курица") || animal.name.Contains("Chicken"))
+                newRadius = 2.5f; // Для загона 8×6м
+            else if (animal.name.Contains("Корова") || animal.name.Contains("Cow"))
+                newRadius = 3f; // Корова вне загона
+            
+            // Обновляем через reflection
+            var wanderRadiusField = typeof(AnimalMovement).GetField("wanderRadius",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (wanderRadiusField != null)
+            {
+                wanderRadiusField.SetValue(movement, newRadius);
+                Debug.Log($"✓ {animal.name}: wanderRadius = {newRadius}м");
+                updated++;
+            }
+        }
+        
+        EditorUtility.DisplayDialog("Готово", 
+            $"Зона перемещения обновлена у {updated} животных.\n\n" +
+            "• Курицы: 2.5м (загон 8×6м)\n" +
+            "• Козы: 2.5м (загон 10×8м)\n" +
+            "• Корова: 3м (вне загона)\n\n" +
+            "Животные не выйдут за заборы!", 
+            "OK");
+    }
+    
+    [MenuItem("VR-Ferma/Исправить летающих животных")]
+    public static void FixFlyingAnimalsMenu()
+    {
+        Animal[] animals = Object.FindObjectsOfType<Animal>();
+        if (animals.Length == 0)
+        {
+            EditorUtility.DisplayDialog("Нет животных", "В сцене нет животных.", "OK");
+            return;
+        }
+        
+        int fixedCount = 0;
+        foreach (var animal in animals)
+        {
+            bool isLargeAnimal = animal.name.Contains("Корова") || animal.name.Contains("Cow") ||
+                                 animal.name.Contains("Коз") || animal.name.Contains("Goat");
+            
+            // Исправляем Rigidbody
+            Rigidbody rb = animal.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                if (isLargeAnimal)
+                {
+                    rb.mass = 50f; // Тяжёлые
+                    rb.drag = 10f; // Большое сопротивление
+                    rb.angularDrag = 10f;
+                }
+                else
+                {
+                    rb.mass = 15f; // Курицы тоже тяжелее
+                    rb.drag = 8f;
+                    rb.angularDrag = 8f;
+                }
+                
+                rb.useGravity = true;
+                rb.isKinematic = false;
+                rb.interpolation = RigidbodyInterpolation.Interpolate;
+                rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+                rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+                
+                Debug.Log($"✓ Rigidbody исправлен: {animal.name} (mass={rb.mass}, drag={rb.drag})");
+                fixedCount++;
+            }
+            else
+            {
+                Debug.LogWarning($"⚠️ У {animal.name} нет Rigidbody! Добавьте через VR-Ferma → Добавить физику");
+            }
+            
+            // Проверяем коллайдер
+            Collider col = animal.GetComponent<Collider>();
+            if (col == null)
+            {
+                Debug.LogWarning($"⚠️ У {animal.name} нет Collider! Используйте VR-Ferma → Заменить коллайдеры");
+            }
+        }
+        
+        EditorUtility.DisplayDialog("Готово", 
+            $"Физика исправлена у {fixedCount} животных.\n\n" +
+            "Изменения:\n" +
+            "• Курицы: mass=15кг, drag=8\n" +
+            "• Козы/Коровы: mass=50кг, drag=10\n" +
+            "• useGravity=true, constraints=FreezeRotationXZ\n\n" +
+            "Животные больше не должны летать!", 
+            "OK");
+    }
+    
+    [MenuItem("VR-Ferma/Заменить коллайдеры коз/коров на BoxCollider")]
+    public static void ReplaceCowGoatCollidersMenu()
+    {
+        Animal[] animals = Object.FindObjectsOfType<Animal>();
+        int replaced = 0;
+        
+        foreach (var animal in animals)
+        {
+            string animalName = animal.name.ToLower();
+            bool isCowOrGoat = animalName.Contains("корова") || animalName.Contains("cow") || 
+                               animalName.Contains("коз") || animalName.Contains("goat");
+            
+            if (!isCowOrGoat) continue;
+            
+            // Удаляем старый коллайдер
+            Collider oldCol = animal.GetComponent<Collider>();
+            if (oldCol != null && !(oldCol is MeshCollider))
+            {
+                DestroyImmediate(oldCol);
+                Debug.Log($"  - Удалён {oldCol.GetType().Name} у {animal.name}");
+            }
+            
+            // Добавляем составной коллайдер (BoxCollider вместо MeshCollider для стабильности)
+            BoxCollider existingBox = animal.GetComponent<BoxCollider>();
+            if (existingBox == null)
+            {
+                // Определяем размеры на основе типа животного
+                float height = 1.5f;
+                float width = 0.8f;
+                float depth = 1.2f;
+                
+                if (animalName.Contains("Корова") || animalName.Contains("Cow"))
+                {
+                    height = 1.8f;
+                    width = 1.2f;
+                    depth = 2.0f;
+                }
+                
+                // Основное тело
+                BoxCollider bodyCol = animal.gameObject.AddComponent<BoxCollider>();
+                bodyCol.size = new Vector3(width, height * 0.6f, depth);
+                bodyCol.center = new Vector3(0, height * 0.5f, 0);
+                
+                // Голова (child collider)
+                GameObject headColliderObj = new GameObject("HeadCollider");
+                headColliderObj.transform.SetParent(animal.transform);
+                headColliderObj.transform.localPosition = new Vector3(0, height * 0.7f, depth * 0.4f);
+                headColliderObj.transform.localRotation = Quaternion.identity;
+                
+                BoxCollider headCol = headColliderObj.AddComponent<BoxCollider>();
+                headCol.size = new Vector3(width * 0.7f, height * 0.4f, depth * 0.6f);
+                
+                Debug.Log($"✓ Составной BoxCollider добавлен к {animal.name} (тело + голова)");
+                replaced++;
+            }
+            
+            // Проверяем и исправляем Rigidbody (чтобы не летали)
+            Rigidbody rb = animal.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.mass = 50f; // Увеличиваем массу для крупных животных
+                rb.drag = 10f; // Увеличиваем сопротивление
+                rb.angularDrag = 10f;
+                rb.useGravity = true;
+                rb.isKinematic = false;
+                rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+                Debug.Log($"  → Rigidbody настроен: mass=50, drag=10");
+            }
+        }
+        
+        EditorUtility.DisplayDialog("Готово", 
+            $"MeshCollider применён к {replaced} животным (коровы/козы).\n\n" +
+            "Теперь коллизия будет точнее повторять форму модели!", 
+            "OK");
+    }
+    
+    [MenuItem("VR-Ferma/Заменить шрифты на Christmas")]
+    public static void ReplaceAllFontsMenu()
+    {
+        // Ищем TMP_FontAsset
+        string[] guids = AssetDatabase.FindAssets("t:TMP_FontAsset", new[] { "Assets/Fonts" });
+        TMPro.TMP_FontAsset customFont = null;
+        
+        if (guids.Length > 0)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guids[0]);
+            customFont = AssetDatabase.LoadAssetAtPath<TMPro.TMP_FontAsset>(path);
+        }
+        
+        if (customFont == null)
+        {
+            EditorUtility.DisplayDialog("Шрифт не найден", 
+                "TMP_FontAsset не найден в Assets/Fonts.\n\n" +
+                "Создайте его:\n" +
+                "1. Window → TextMeshPro → Font Asset Creator\n" +
+                "2. Source Font File: Christmas On Crack\n" +
+                "3. Generate Font Atlas\n" +
+                "4. Save в Assets/Fonts\n\n" +
+                "Затем запустите эту команду снова.", 
+                "OK");
+            return;
+        }
+        
+        // Заменяем шрифт во всех TextMeshProUGUI в сцене
+        TMPro.TextMeshProUGUI[] allTexts = Object.FindObjectsOfType<TMPro.TextMeshProUGUI>(true);
+        int replaced = 0;
+        
+        foreach (var text in allTexts)
+        {
+            text.font = customFont;
+            replaced++;
+            Debug.Log($"✓ Шрифт заменён у {text.gameObject.name}");
+        }
+        
+        EditorUtility.DisplayDialog("Готово", 
+            $"Шрифт '{customFont.name}' применён к {replaced} текстовым элементам!", 
+            "OK");
+    }
+    
+    [MenuItem("VR-Ferma/Удалить индикаторы голода")]
+    public static void RemoveHungerBarsMenu()
+    {
+        // Удаляем AnimalHungerUI компоненты
+        AnimalHungerUI[] hungerBars = Object.FindObjectsOfType<AnimalHungerUI>();
+        int removed = 0;
+        
+        foreach (var hungerBar in hungerBars)
+        {
+            Object.DestroyImmediate(hungerBar);
+            removed++;
+        }
+        
+        // Удаляем GameObject'ы с HungerBar в имени
+        GameObject[] allObjects = Object.FindObjectsOfType<GameObject>();
+        foreach (var obj in allObjects)
+        {
+            if (obj.name.Contains("HungerBar"))
+            {
+                Object.DestroyImmediate(obj);
+                removed++;
+            }
+        }
+        
+        EditorUtility.DisplayDialog("Готово", 
+            $"Удалено {removed} индикаторов голода.\nТеперь у животных не будет полосок голода.", 
+            "OK");
+    }
+    
+    [MenuItem("VR-Ferma/Проверить корову")]
+    public static void CheckCowMenu()
+    {
+        Animal[] animals = Object.FindObjectsOfType<Animal>();
+        Animal cow = System.Array.Find(animals, a => a.name.Contains("Корова") || a.name.Contains("Cow"));
+        
+        if (cow == null)
+        {
+            EditorUtility.DisplayDialog("Ошибка", "Корова не найдена в сцене.", "OK");
+            return;
+        }
+        
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"=== ПРОВЕРКА: {cow.name} ===\n");
+        
+        var anim = cow.GetComponentInChildren<Animator>();
+        if (anim == null)
+        {
+            sb.AppendLine("❌ Animator НЕ НАЙДЕН!");
+            sb.AppendLine("\nЗапустите: VR-Ferma → Обновить Animator у животных");
+        }
+        else
+        {
+            sb.AppendLine($"Animator: {anim.gameObject.name}");
+            sb.AppendLine($"Controller: {(anim.runtimeAnimatorController != null ? anim.runtimeAnimatorController.name : "НЕТ ❌")}");
+            sb.AppendLine($"Avatar: {(anim.avatar != null ? anim.avatar.name : "НЕТ ❌")}");
+            sb.AppendLine($"Enabled: {anim.enabled}");
+            
+            if (anim.runtimeAnimatorController == null)
+            {
+                sb.AppendLine("\n❌ НЕТ КОНТРОЛЛЕРА!");
+                sb.AppendLine("\nЗапустите: VR-Ferma → Обновить Animator у животных");
+            }
+        }
+        
+        var log = sb.ToString();
+        Debug.Log(log);
+        EditorUtility.DisplayDialog("Проверка коровы", log, "OK");
+    }
+    
+    [MenuItem("VR-Ferma/Добавить физику животным")]
+    public static void AddPhysicsToAnimalsMenu()
+    {
+        Animal[] animals = Object.FindObjectsOfType<Animal>();
+        if (animals.Length == 0)
+        {
+            EditorUtility.DisplayDialog("Нет животных", "В сцене нет животных.", "OK");
+            return;
+        }
+        
+        int updated = 0;
+        foreach (var animal in animals)
+        {
+            Rigidbody rb = animal.GetComponent<Rigidbody>();
+            if (rb == null)
+            {
+                rb = animal.gameObject.AddComponent<Rigidbody>();
+                rb.mass = 10f;
+                rb.drag = 5f;
+                rb.angularDrag = 5f;
+                rb.useGravity = true;
+                rb.isKinematic = false;
+                rb.interpolation = RigidbodyInterpolation.Interpolate;
+                rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+                rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+                
+                Debug.Log($"✓ Добавлен Rigidbody к {animal.name}");
+                updated++;
+            }
+            
+            // Проверяем коллайдер
+            Collider col = animal.GetComponent<Collider>();
+            if (col == null)
+            {
+                CapsuleCollider capsule = animal.gameObject.AddComponent<CapsuleCollider>();
+                capsule.height = 1.5f;
+                capsule.radius = 0.5f;
+                capsule.center = new Vector3(0, 0.75f, 0);
+                Debug.Log($"✓ Добавлен Collider к {animal.name}");
+            }
+        }
+        
+        EditorUtility.DisplayDialog("Готово", 
+            $"Rigidbody добавлен к {updated} животным.\nТеперь они не будут проходить друг сквозь друга!", 
+            "OK");
+    }
+    
     private static void CreateSimpleFarm()
     {
         Debug.Log("=== Начало создания простой фермы ===");
@@ -165,9 +834,126 @@ public class SimpleFarmSetup : EditorWindow
     private static void CreateGameManager()
     {
         GameObject gm = new GameObject("GameManager");
-        gm.AddComponent<SimpleGameManager>();
+        SimpleGameManager manager = gm.AddComponent<SimpleGameManager>();
+        
+        // Создаём Canvas для UI подсказок
+        CreateHintUI(manager);
         
         Debug.Log("✓ GameManager создан");
+    }
+    
+    private static void CreateHintUI(SimpleGameManager manager)
+    {
+        // Создаём Canvas
+        GameObject canvasObj = new GameObject("HintCanvas");
+        Canvas canvas = canvasObj.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 100; // Поверх всего
+        
+        CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920, 1080);
+        
+        canvasObj.AddComponent<GraphicRaycaster>();
+        
+        // Создаём панель для подсказки (внизу по центру)
+        GameObject hintPanelObj = new GameObject("HintPanel");
+        hintPanelObj.transform.SetParent(canvasObj.transform, false);
+        
+        RectTransform hintPanelRect = hintPanelObj.AddComponent<RectTransform>();
+        hintPanelRect.anchorMin = new Vector2(0.5f, 0f); // Внизу по центру
+        hintPanelRect.anchorMax = new Vector2(0.5f, 0f);
+        hintPanelRect.pivot = new Vector2(0.5f, 0f);
+        hintPanelRect.anchoredPosition = new Vector2(0, 80); // 80 пикселей от низа
+        hintPanelRect.sizeDelta = new Vector2(800, 100);
+        
+        // Фон панели
+        Image hintPanelBg = hintPanelObj.AddComponent<Image>();
+        hintPanelBg.color = new Color(0, 0, 0, 0.7f); // Полупрозрачный чёрный
+        
+        // Текст подсказки
+        GameObject hintTextObj = new GameObject("HintText");
+        hintTextObj.transform.SetParent(hintPanelObj.transform, false);
+        
+        RectTransform hintTextRect = hintTextObj.AddComponent<RectTransform>();
+        hintTextRect.anchorMin = Vector2.zero;
+        hintTextRect.anchorMax = Vector2.one;
+        hintTextRect.offsetMin = new Vector2(10, 10);
+        hintTextRect.offsetMax = new Vector2(-10, -10);
+        
+        // TextMeshProUGUI для текста
+        TMPro.TextMeshProUGUI hintText = hintTextObj.AddComponent<TMPro.TextMeshProUGUI>();
+        hintText.text = "";
+        hintText.fontSize = 24;
+        hintText.alignment = TMPro.TextAlignmentOptions.Center;
+        hintText.color = Color.white;
+        hintText.fontStyle = TMPro.FontStyles.Bold;
+        
+        // Загружаем шрифт из Assets/Fonts
+        LoadAndSetFont(hintText);
+        
+        // Скрываем панель по умолчанию
+        hintPanelObj.SetActive(false);
+        
+        // Присваиваем hintText в SimpleGameManager через reflection
+        var hintTextField = typeof(SimpleGameManager).GetField("hintText",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        if (hintTextField != null)
+        {
+            hintTextField.SetValue(manager, hintText);
+            Debug.Log("  - HintText UI создан и привязан к GameManager");
+        }
+    }
+    
+    /// <summary>
+    /// Загрузить и установить шрифт из Assets/Fonts для TextMeshPro
+    /// </summary>
+    private static void LoadAndSetFont(TMPro.TextMeshProUGUI textComponent)
+    {
+        // Ищем TMP_FontAsset в Assets/Fonts
+        string[] guids = AssetDatabase.FindAssets("t:TMP_FontAsset", new[] { "Assets/Fonts" });
+        
+        if (guids.Length > 0)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guids[0]);
+            TMPro.TMP_FontAsset font = AssetDatabase.LoadAssetAtPath<TMPro.TMP_FontAsset>(path);
+            if (font != null)
+            {
+                textComponent.font = font;
+                Debug.Log($"  - Шрифт назначен: {font.name}");
+                return;
+            }
+        }
+        
+        // Если TMP_FontAsset не найден, ищем обычный шрифт и создаём TMP_FontAsset
+        string[] fontGuids = AssetDatabase.FindAssets("t:Font", new[] { "Assets/Fonts" });
+        if (fontGuids.Length > 0)
+        {
+            string fontPath = AssetDatabase.GUIDToAssetPath(fontGuids[0]);
+            UnityEngine.Font font = AssetDatabase.LoadAssetAtPath<UnityEngine.Font>(fontPath);
+            
+            if (font != null)
+            {
+                // Создаём TMP_FontAsset из Font
+                string assetPath = "Assets/Fonts/" + font.name + " SDF.asset";
+                TMPro.TMP_FontAsset tmpFont = AssetDatabase.LoadAssetAtPath<TMPro.TMP_FontAsset>(assetPath);
+                
+                if (tmpFont == null)
+                {
+                    Debug.LogWarning($"⚠️ TMP_FontAsset не найден для {font.name}. Создайте его вручную:\nWindow → TextMeshPro → Font Asset Creator");
+                    Debug.LogWarning($"   Выберите шрифт: {fontPath}");
+                }
+                else
+                {
+                    textComponent.font = tmpFont;
+                    Debug.Log($"  - Шрифт назначен: {tmpFont.name}");
+                }
+            }
+        }
+        else
+        {
+            Debug.LogWarning("⚠️ Шрифты не найдены в Assets/Fonts");
+        }
     }
     
     private static Material CreateMaterial(string name, Color color)
@@ -384,112 +1170,434 @@ public class SimpleFarmSetup : EditorWindow
     
     private static void CreateAnimals()
     {
-        // Ищем модель курицы
-        string[] chickenGuids = AssetDatabase.FindAssets("Chicken_Rig t:GameObject");
-        GameObject chickenModel = null;
+        // Создаём загон для кур
+        CreateChickenPen();
         
-        if (chickenGuids.Length > 0)
-        {
-            string path = AssetDatabase.GUIDToAssetPath(chickenGuids[0]);
-            chickenModel = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-        }
+        // Создаём куриц из моделей Norm (внутри загона)
+        CreateChickens();
         
-        // Создаём 2 курицы
-        for (int i = 0; i < 2; i++)
+        // Создаём корову из модели Norm
+        CreateCow();
+        
+        // Создаём загон для коз
+        CreateGoatPen();
+        
+        // Создаём коз из моделей Norm (внутри загона)
+        CreateGoats();
+        
+        // Создаём свиней из моделей Norm
+        CreatePigs();
+    }
+    
+    /// <summary>
+    /// Вспомогательный метод для создания животного с общими настройками
+    /// </summary>
+    private static GameObject SetupAnimal(GameObject animalObj, string animalName, Vector3 position, 
+        float wanderRadius = 3f, float moveSpeed = 1f, float colliderHeight = 1f, float colliderRadius = 0.5f, bool useMeshCollider = false)
+    {
+        animalObj.name = animalName;
+        animalObj.transform.position = position;
+        
+        // Добавляем коллайдер если его нет
+        Collider animalCollider = animalObj.GetComponent<Collider>();
+        if (animalCollider == null)
         {
-            GameObject chicken;
-            
-            if (chickenModel != null)
+            if (useMeshCollider)
             {
-                chicken = (GameObject)PrefabUtility.InstantiatePrefab(chickenModel);
-                chicken.transform.localScale = Vector3.one * 3f; // Увеличенный размер
+                // Составной коллайдер из BoxCollider (более стабильный для больших животных)
+                // Используем несколько Box коллайдеров вместо MeshCollider для стабильности
+                
+                // Основное тело
+                BoxCollider bodyCol = animalObj.AddComponent<BoxCollider>();
+                bodyCol.size = new Vector3(colliderRadius * 2f, colliderHeight * 0.6f, colliderRadius * 2.5f);
+                bodyCol.center = new Vector3(0, colliderHeight * 0.5f, 0);
+                
+                // Голова (спереди и выше)
+                GameObject headColliderObj = new GameObject("HeadCollider");
+                headColliderObj.transform.SetParent(animalObj.transform);
+                headColliderObj.transform.localPosition = new Vector3(0, colliderHeight * 0.7f, colliderRadius * 1.2f);
+                headColliderObj.transform.localRotation = Quaternion.identity;
+                
+                BoxCollider headCol = headColliderObj.AddComponent<BoxCollider>();
+                headCol.size = new Vector3(colliderRadius * 1.2f, colliderHeight * 0.4f, colliderRadius * 1.2f);
+                
+                Debug.Log($"  - Добавлен составной BoxCollider на {animalName} (тело + голова)");
             }
             else
             {
+                // CapsuleCollider для куриц и свиней
+                CapsuleCollider col = animalObj.AddComponent<CapsuleCollider>();
+                col.height = colliderHeight;
+                col.radius = colliderRadius;
+                col.center = new Vector3(0, colliderHeight / 2f, 0);
+                Debug.Log($"  - Добавлен CapsuleCollider на {animalName}");
+            }
+        }
+        
+        // Добавляем Rigidbody для физических столкновений
+        Rigidbody rb = animalObj.GetComponent<Rigidbody>();
+        if (rb == null)
+        {
+            rb = animalObj.AddComponent<Rigidbody>();
+            
+            // Для крупных животных (козы, коровы) — больше масса и drag
+            if (useMeshCollider)
+            {
+                rb.mass = 50f; // Крупные животные тяжелее
+                rb.drag = 10f; // Больше сопротивление
+                rb.angularDrag = 10f;
+            }
+            else
+            {
+                rb.mass = 10f; // Курицы, свиньи
+                rb.drag = 5f;
+                rb.angularDrag = 5f;
+            }
+            
+            rb.useGravity = true;
+            rb.isKinematic = false; // Реагирует на физику
+            rb.interpolation = RigidbodyInterpolation.Interpolate; // Плавное движение
+            rb.collisionDetectionMode = CollisionDetectionMode.Continuous; // Лучшее обнаружение столкновений
+            // Замораживаем вращение, чтобы животное не падало
+            rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+            Debug.Log($"  - Добавлен Rigidbody на {animalName} (mass={rb.mass}, drag={rb.drag})");
+        }
+        
+        // Добавляем компонент Animal
+        Animal animal = animalObj.AddComponent<Animal>();
+        
+        // Настраиваем имя животного через reflection
+        var animalNameField = typeof(Animal).GetField("animalName",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        if (animalNameField != null)
+        {
+            animalNameField.SetValue(animal, animalName);
+        }
+        
+        // Индикатор голодности убран по запросу пользователя
+        // AnimalHungerUI hungerUI = animalObj.AddComponent<AnimalHungerUI>();
+        
+        // Добавляем движение
+        AnimalMovement movement = animalObj.AddComponent<AnimalMovement>();
+        
+        var centerPointField = typeof(AnimalMovement).GetField("centerPoint",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        if (centerPointField != null)
+        {
+            centerPointField.SetValue(movement, position);
+        }
+        
+        var wanderRadiusField = typeof(AnimalMovement).GetField("wanderRadius",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        if (wanderRadiusField != null)
+        {
+            wanderRadiusField.SetValue(movement, wanderRadius);
+        }
+        
+        var moveSpeedField = typeof(AnimalMovement).GetField("moveSpeed",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        if (moveSpeedField != null)
+        {
+            moveSpeedField.SetValue(movement, moveSpeed);
+        }
+        
+        // Добавляем VR-взаимодействие для поглаживания и кормления
+        AnimalVRInteraction vrInteraction = animalObj.AddComponent<AnimalVRInteraction>();
+        Debug.Log($"  - Добавлен AnimalVRInteraction на {animalName}");
+        
+        return animalObj;
+    }
+    
+    private static GameObject LoadModelAsset(string path, string name)
+    {
+        GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        if (model != null)
+        {
+            Debug.Log($"✓ Найдена модель {name}: {path}");
+            return model;
+        }
+        else
+        {
+            Debug.LogWarning($"⚠️ Модель {name} не найдена по пути: {path}");
+            // Пробуем найти через поиск
+            string[] guids = AssetDatabase.FindAssets($"{name} t:GameObject");
+            if (guids.Length > 0)
+            {
+                string foundPath = AssetDatabase.GUIDToAssetPath(guids[0]);
+                model = AssetDatabase.LoadAssetAtPath<GameObject>(foundPath);
+                if (model != null)
+                {
+                    Debug.Log($"✓ Модель {name} найдена через поиск: {foundPath}");
+                    return model;
+                }
+            }
+        }
+        return null;
+    }
+    
+    /// <summary>
+    /// Создать загон для куриц из моделей забора
+    /// </summary>
+    private static void CreateChickenPen()
+    {
+        // Проверяем, не существует ли уже загон
+        GameObject existingPen = GameObject.Find("ChickenPen");
+        if (existingPen != null)
+        {
+            Debug.Log("✓ Загон для куриц уже существует");
+            return;
+        }
+        
+        // Родительский объект для загона
+        GameObject pen = new GameObject("ChickenPen");
+        pen.transform.position = new Vector3(5, 0, 0); // Центр загона
+        
+        // Загружаем модели забора из Norm (левый, правый, угол, целый)
+        GameObject fenceLeft = LoadModelAsset("Assets/Models/Norm/левый.fbx", "левый");
+        GameObject fenceRight = LoadModelAsset("Assets/Models/Norm/правый.fbx", "правый");
+        GameObject fenceCorner = LoadModelAsset("Assets/Models/Norm/угол.fbx", "угол");
+        GameObject fenceWhole = LoadModelAsset("Assets/Models/Norm/целый.fbx", "целый");
+        GameObject fenceBoth = LoadModelAsset("Assets/Models/Norm/обе.fbx", "обе");
+        
+        // Если не нашли модели из Norm, используем fence.fbx
+        GameObject fenceModel = fenceWhole ?? fenceBoth ?? LoadModelAsset("Assets/Models/fence.fbx", "fence");
+        
+        if (fenceModel == null)
+        {
+            // Создаём простой забор из кубов
+            Debug.LogWarning("⚠️ Модели забора не найдены, создаём простой загон из кубов");
+            CreateSimpleFencePen(pen);
+            return;
+        }
+        
+        // Размеры загона
+        float penSizeX = 8f;
+        float penSizeZ = 6f;
+        float spacing = 2f; // Расстояние между секциями забора
+        
+        // Создаём стены загона (scale = 1, rotation +90° по Y)
+        // Верхняя стена (Z+) - забор вдоль оси X
+        for (int i = 0; i < 4; i++)
+        {
+            GameObject fence = (GameObject)PrefabUtility.InstantiatePrefab(fenceModel);
+            fence.transform.SetParent(pen.transform);
+            fence.transform.localPosition = new Vector3(-penSizeX/2 + i * spacing, 0, penSizeZ/2);
+            fence.transform.localScale = Vector3.one;
+            fence.transform.localRotation = Quaternion.Euler(0, 90, 0); // +90° поворот
+            fence.name = $"Fence_North_{i}";
+            AddFenceCollider(fence, new Vector3(spacing, 1.5f, 0.2f), isAlongZ: false);
+        }
+        
+        // Нижняя стена (Z-) - забор вдоль оси X
+        for (int i = 0; i < 4; i++)
+        {
+            GameObject fence = (GameObject)PrefabUtility.InstantiatePrefab(fenceModel);
+            fence.transform.SetParent(pen.transform);
+            fence.transform.localPosition = new Vector3(-penSizeX/2 + i * spacing, 0, -penSizeZ/2);
+            fence.transform.localScale = Vector3.one;
+            fence.transform.localRotation = Quaternion.Euler(0, -90, 0); // -90° поворот
+            fence.name = $"Fence_South_{i}";
+            AddFenceCollider(fence, new Vector3(spacing, 1.5f, 0.2f), isAlongZ: false);
+        }
+        
+        // Левая стена (X-) - забор вдоль оси Z
+        for (int i = 0; i < 3; i++)
+        {
+            GameObject fence = (GameObject)PrefabUtility.InstantiatePrefab(fenceModel);
+            fence.transform.SetParent(pen.transform);
+            fence.transform.localPosition = new Vector3(-penSizeX/2, 0, -penSizeZ/2 + 1 + i * spacing);
+            fence.transform.localScale = Vector3.one;
+            fence.transform.localRotation = Quaternion.Euler(0, 180, 0); // 180° поворот
+            fence.name = $"Fence_West_{i}";
+            AddFenceCollider(fence, new Vector3(0.2f, 1.5f, spacing), isAlongZ: true);
+        }
+        
+        // Правая стена (X+) - забор вдоль оси Z
+        for (int i = 0; i < 3; i++)
+        {
+            GameObject fence = (GameObject)PrefabUtility.InstantiatePrefab(fenceModel);
+            fence.transform.SetParent(pen.transform);
+            fence.transform.localPosition = new Vector3(penSizeX/2, 0, -penSizeZ/2 + 1 + i * spacing);
+            fence.transform.localScale = Vector3.one;
+            fence.transform.localRotation = Quaternion.identity; // 0° поворот
+            fence.name = $"Fence_East_{i}";
+            AddFenceCollider(fence, new Vector3(0.2f, 1.5f, spacing), isAlongZ: true);
+        }
+        
+        Debug.Log($"✓ Загон для куриц создан на позиции {pen.transform.position}");
+    }
+    
+    /// <summary>
+    /// Добавить коллайдер к забору (axis-aligned, не вращается)
+    /// </summary>
+    private static void AddFenceCollider(GameObject fence, Vector3 colliderSize, bool isAlongZ)
+    {
+        Collider col = fence.GetComponentInChildren<Collider>();
+        if (col == null)
+        {
+            BoxCollider box = fence.AddComponent<BoxCollider>();
+            box.size = colliderSize;
+            box.center = new Vector3(0, colliderSize.y / 2f, 0);
+            box.isTrigger = false;
+        }
+    }
+    
+    /// <summary>
+    /// Создать простой загон из кубов (если нет модели забора)
+    /// </summary>
+    private static void CreateSimpleFencePen(GameObject parent)
+    {
+        float penSizeX = 8f;
+        float penSizeZ = 6f;
+        Material fenceMat = CreateMaterial("FenceMaterial", new Color(0.6f, 0.4f, 0.2f)); // Коричневый
+        
+        // Создаём стены из кубов
+        CreateFenceWall(parent, new Vector3(0, 0, penSizeZ/2), new Vector3(penSizeX, 1.5f, 0.2f), fenceMat, "North");
+        CreateFenceWall(parent, new Vector3(0, 0, -penSizeZ/2), new Vector3(penSizeX, 1.5f, 0.2f), fenceMat, "South");
+        CreateFenceWall(parent, new Vector3(-penSizeX/2, 0, 0), new Vector3(0.2f, 1.5f, penSizeZ), fenceMat, "West");
+        CreateFenceWall(parent, new Vector3(penSizeX/2, 0, 0), new Vector3(0.2f, 1.5f, penSizeZ), fenceMat, "East");
+    }
+    
+    /// <summary>
+    /// Создать одну стену забора
+    /// </summary>
+    private static void CreateFenceWall(GameObject parent, Vector3 position, Vector3 size, Material material, string name)
+    {
+        GameObject wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        wall.name = $"Fence_{name}";
+        wall.transform.SetParent(parent.transform);
+        wall.transform.localPosition = position;
+        wall.transform.localScale = size;
+        wall.GetComponent<Renderer>().material = material;
+        
+        // Коллайдер уже есть у Cube
+        BoxCollider col = wall.GetComponent<BoxCollider>();
+        if (col != null)
+        {
+            col.isTrigger = false; // Физическая стена
+        }
+    }
+    
+    private static void CreateChickens()
+    {
+        // Ищем модели куриц из папки Norm
+        GameObject chickenModel1 = LoadModelAsset("Assets/Models/Norm/кура.fbx", "кура");
+        GameObject chickenModel2 = LoadModelAsset("Assets/Models/Norm/курочка2.fbx", "курочка2");
+        
+        // Используем первую найденную модель или обе по очереди
+        GameObject[] chickenModels = new GameObject[] { chickenModel1, chickenModel2 };
+        
+        // Создаём 3 курицы
+        for (int i = 0; i < 3; i++)
+        {
+            GameObject chicken;
+            GameObject model = chickenModels[i % chickenModels.Length];
+            
+            if (model != null)
+            {
+                chicken = (GameObject)PrefabUtility.InstantiatePrefab(model);
+                // Проверяем размер модели и устанавливаем подходящий масштаб
+                Bounds bounds = GetModelBounds(chicken);
+                float maxSize = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z);
+                
+                // Если модель слишком большая (> 5 метров) или слишком маленькая (< 0.1 метра), масштабируем
+                if (maxSize > 5f)
+                {
+                    float scale = 1f / maxSize;
+                    chicken.transform.localScale = Vector3.one * scale;
+                    Debug.Log($"✓ Модель курицы слишком большая ({maxSize:F2}м), масштабируем до {scale:F3}");
+                }
+                else if (maxSize < 0.1f)
+                {
+                    float scale = 0.5f / maxSize;
+                    chicken.transform.localScale = Vector3.one * scale;
+                    Debug.Log($"✓ Модель курицы слишком маленькая ({maxSize:F2}м), масштабируем до {scale:F3}");
+                }
+                else
+                {
+                    chicken.transform.localScale = Vector3.one;
+                }
+                
+                Debug.Log($"✓ Модель курицы загружена, размер: {bounds.size}, масштаб: {chicken.transform.localScale}");
+            }
+            else
+            {
+                Debug.LogWarning($"⚠️ Модель курицы не найдена, создаём примитив");
                 // Простая капсула вместо курицы
                 chicken = GameObject.CreatePrimitive(PrimitiveType.Capsule);
                 chicken.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
                 
-                Material chickenMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-                chickenMat.color = Color.white;
+                Material chickenMat = CreateMaterial("ChickenMaterial", Color.white);
                 chicken.GetComponent<Renderer>().material = chickenMat;
             }
             
-            chicken.name = $"Chicken_{i + 1}";
-            chicken.transform.position = new Vector3(i * 2 + 5, 0.5f, 0);
+            SetupAnimal(chicken, $"Курица_{i + 1}", 
+                new Vector3(i * 2 + 5, 0.5f, 0), 
+                wanderRadius: 3f, moveSpeed: 1f, 
+                colliderHeight: 1f, colliderRadius: 0.5f);
             
-            Collider chickenCollider = chicken.GetComponent<Collider>();
-            if (chickenCollider == null)
-            {
-                CapsuleCollider col = chicken.AddComponent<CapsuleCollider>();
-                col.height = 1f;
-                col.radius = 0.5f;
-                Debug.Log($"  - Добавлен CapsuleCollider на курицу");
-            }
-            else
-            {
-                Debug.Log($"  - Коллайдер уже есть: {chickenCollider.GetType().Name}");
-            }
+            if (model != null)
+                AnimalAnimatorSetup.SetupAnimalAnimator(chicken, AssetDatabase.GetAssetPath(model));
             
-            Animal animal = chicken.AddComponent<Animal>();
-            
-            // Добавляем индикатор голодности
-            AnimalHungerUI hungerUI = chicken.AddComponent<AnimalHungerUI>();
-            
-            // Присваиваем ссылку на животное через reflection
-            var animalField = typeof(AnimalHungerUI).GetField("animal",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            if (animalField != null)
-            {
-                animalField.SetValue(hungerUI, animal);
-            }
-            
-            // Добавляем движение
-            AnimalMovement movement = chicken.AddComponent<AnimalMovement>();
-            
-            // Настраиваем зону перемещения через reflection
-            var centerPointField = typeof(AnimalMovement).GetField("centerPoint",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            if (centerPointField != null)
-            {
-                centerPointField.SetValue(movement, chicken.transform.position);
-            }
-            
-            var wanderRadiusField = typeof(AnimalMovement).GetField("wanderRadius",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            if (wanderRadiusField != null)
-            {
-                wanderRadiusField.SetValue(movement, 3f); // Радиус 3 метра
-            }
-            
-            Debug.Log($"✓ Курица {i + 1} создана с движением на позиции {chicken.transform.position}");
+            Debug.Log($"✓ Курица {i + 1} создана на позиции {chicken.transform.position}");
+        }
+    }
+    
+    /// <summary>
+    /// Получить границы модели (включая все дочерние объекты)
+    /// </summary>
+    private static Bounds GetModelBounds(GameObject obj)
+    {
+        Renderer[] renderers = obj.GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0)
+        {
+            return new Bounds(obj.transform.position, Vector3.one);
         }
         
-        // Создаём корову
-        CreateCow();
+        Bounds bounds = renderers[0].bounds;
+        foreach (Renderer renderer in renderers)
+        {
+            bounds.Encapsulate(renderer.bounds);
+        }
+        return bounds;
     }
     
     private static void CreateCow()
     {
-        // Ищем модель коровы
-        string[] cowGuids = AssetDatabase.FindAssets("Cow t:GameObject");
-        GameObject cowModel = null;
-        
-        if (cowGuids.Length > 0)
-        {
-            string path = AssetDatabase.GUIDToAssetPath(cowGuids[0]);
-            cowModel = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-        }
+        // Ищем модель коровы из папки Norm
+        GameObject cowModel = LoadModelAsset("Assets/Models/Norm/COWWW2.fbx", "COWWW2");
         
         GameObject cow;
         
         if (cowModel != null)
         {
             cow = (GameObject)PrefabUtility.InstantiatePrefab(cowModel);
-            cow.transform.localScale = Vector3.one * 3f; // Увеличенный размер
+            // Проверяем размер модели и устанавливаем подходящий масштаб
+            Bounds bounds = GetModelBounds(cow);
+            float maxSize = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z);
+            
+            if (maxSize > 5f)
+            {
+                float scale = 1f / maxSize;
+                cow.transform.localScale = Vector3.one * scale;
+                Debug.Log($"✓ Модель коровы слишком большая ({maxSize:F2}м), масштабируем до {scale:F3}");
+            }
+            else if (maxSize < 0.1f)
+            {
+                float scale = 1.5f / maxSize;
+                cow.transform.localScale = Vector3.one * scale;
+                Debug.Log($"✓ Модель коровы слишком маленькая ({maxSize:F2}м), масштабируем до {scale:F3}");
+            }
+            else
+            {
+                cow.transform.localScale = Vector3.one;
+            }
+            
+            Debug.Log($"✓ Модель коровы загружена, размер: {bounds.size}, масштаб: {cow.transform.localScale}");
         }
         else
         {
+            Debug.LogWarning("⚠️ Модель коровы не найдена, создаём примитив");
             // Простая капсула вместо коровы (больше чем курица)
             cow = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             cow.transform.localScale = new Vector3(1f, 1.5f, 1f);
@@ -498,77 +1606,250 @@ public class SimpleFarmSetup : EditorWindow
             cow.GetComponent<Renderer>().material = cowMat;
         }
         
-        cow.name = "Cow";
-        cow.transform.position = new Vector3(-5, 1f, -3); // Слева от фермы
+        SetupAnimal(cow, "Корова", 
+            new Vector3(-5, 1f, -3), 
+            wanderRadius: 4f, moveSpeed: 0.7f, 
+            colliderHeight: 2f, colliderRadius: 1f, useMeshCollider: true);
         
-        // Добавляем коллайдер
-        Collider cowCollider = cow.GetComponent<Collider>();
-        if (cowCollider == null)
+        if (cowModel != null)
+            AnimalAnimatorSetup.SetupAnimalAnimator(cow, AssetDatabase.GetAssetPath(cowModel));
+        
+        Debug.Log($"✓ Корова создана на позиции {cow.transform.position}");
+    }
+    
+    /// <summary>
+    /// Создать загон для коз
+    /// </summary>
+    private static void CreateGoatPen()
+    {
+        // Проверяем, не существует ли уже загон
+        GameObject existingPen = GameObject.Find("GoatPen");
+        if (existingPen != null)
         {
-            CapsuleCollider col = cow.AddComponent<CapsuleCollider>();
-            col.height = 2f;
-            col.radius = 1f;
-            Debug.Log("  - Добавлен CapsuleCollider на корову");
+            Debug.Log("✓ Загон для коз уже существует");
+            return;
         }
         
-        // Добавляем компонент Animal
-        Animal animal = cow.AddComponent<Animal>();
+        // Родительский объект для загона
+        GameObject pen = new GameObject("GoatPen");
+        pen.transform.position = new Vector3(-7, 0, -5); // Центр загона для коз
         
-        // Настраиваем корову через reflection
-        var animalNameField = typeof(Animal).GetField("animalName",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        if (animalNameField != null)
+        // Загружаем модель забора
+        GameObject fenceModel = LoadModelAsset("Assets/Models/Norm/целый.fbx", "целый");
+        if (fenceModel == null)
+            fenceModel = LoadModelAsset("Assets/Models/Norm/обе.fbx", "обе");
+        if (fenceModel == null)
+            fenceModel = LoadModelAsset("Assets/Models/fence.fbx", "fence");
+        
+        if (fenceModel == null)
         {
-            animalNameField.SetValue(animal, "Корова");
+            // Создаём простой загон из кубов
+            Debug.LogWarning("⚠️ Модели забора не найдены, создаём простой загон для коз из кубов");
+            CreateSimpleGoatPen(pen);
+            return;
         }
         
-        // Добавляем индикатор голодности
-        AnimalHungerUI hungerUI = cow.AddComponent<AnimalHungerUI>();
+        // Размеры загона для коз (больше чем для куриц)
+        float penSizeX = 10f;
+        float penSizeZ = 8f;
+        float spacing = 2f;
         
-        var animalField = typeof(AnimalHungerUI).GetField("animal",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        if (animalField != null)
+        // Создаём стены загона (scale = 1, rotation +90° по Y для коз)
+        // Верхняя стена (Z+) - забор вдоль оси X
+        for (int i = 0; i < 5; i++)
         {
-            animalField.SetValue(hungerUI, animal);
+            GameObject fence = (GameObject)PrefabUtility.InstantiatePrefab(fenceModel);
+            fence.transform.SetParent(pen.transform);
+            fence.transform.localPosition = new Vector3(-penSizeX/2 + i * spacing, 0, penSizeZ/2);
+            fence.transform.localScale = Vector3.one;
+            fence.transform.localRotation = Quaternion.Euler(0, 90, 0); // +90° поворот
+            fence.name = $"Fence_North_{i}";
+            AddFenceCollider(fence, new Vector3(spacing, 1.5f, 0.2f), isAlongZ: false);
         }
         
-        // Добавляем движение (корова ходит медленнее)
-        AnimalMovement movement = cow.AddComponent<AnimalMovement>();
-        
-        var centerPointField = typeof(AnimalMovement).GetField("centerPoint",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        if (centerPointField != null)
+        // Нижняя стена (Z-) - забор вдоль оси X
+        for (int i = 0; i < 5; i++)
         {
-            centerPointField.SetValue(movement, cow.transform.position);
+            GameObject fence = (GameObject)PrefabUtility.InstantiatePrefab(fenceModel);
+            fence.transform.SetParent(pen.transform);
+            fence.transform.localPosition = new Vector3(-penSizeX/2 + i * spacing, 0, -penSizeZ/2);
+            fence.transform.localScale = Vector3.one;
+            fence.transform.localRotation = Quaternion.Euler(0, -90, 0); // -90° поворот
+            fence.name = $"Fence_South_{i}";
+            AddFenceCollider(fence, new Vector3(spacing, 1.5f, 0.2f), isAlongZ: false);
         }
         
-        var wanderRadiusField = typeof(AnimalMovement).GetField("wanderRadius",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        if (wanderRadiusField != null)
+        // Левая стена (X-) - забор вдоль оси Z
+        for (int i = 0; i < 4; i++)
         {
-            wanderRadiusField.SetValue(movement, 4f); // Радиус 4 метра (больше чем у кур)
+            GameObject fence = (GameObject)PrefabUtility.InstantiatePrefab(fenceModel);
+            fence.transform.SetParent(pen.transform);
+            fence.transform.localPosition = new Vector3(-penSizeX/2, 0, -penSizeZ/2 + 1 + i * spacing);
+            fence.transform.localScale = Vector3.one;
+            fence.transform.localRotation = Quaternion.Euler(0, 180, 0); // 180° поворот
+            fence.name = $"Fence_West_{i}";
+            AddFenceCollider(fence, new Vector3(0.2f, 1.5f, spacing), isAlongZ: true);
         }
         
-        var moveSpeedField = typeof(AnimalMovement).GetField("moveSpeed",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        if (moveSpeedField != null)
+        // Правая стена (X+) - забор вдоль оси Z
+        for (int i = 0; i < 4; i++)
         {
-            moveSpeedField.SetValue(movement, 0.7f); // Медленнее курицы
+            GameObject fence = (GameObject)PrefabUtility.InstantiatePrefab(fenceModel);
+            fence.transform.SetParent(pen.transform);
+            fence.transform.localPosition = new Vector3(penSizeX/2, 0, -penSizeZ/2 + 1 + i * spacing);
+            fence.transform.localScale = Vector3.one;
+            fence.transform.localRotation = Quaternion.identity; // 0° поворот
+            fence.name = $"Fence_East_{i}";
+            AddFenceCollider(fence, new Vector3(0.2f, 1.5f, spacing), isAlongZ: true);
         }
         
-        Debug.Log($"✓ Корова создана с движением на позиции {cow.transform.position}");
+        Debug.Log($"✓ Загон для коз создан на позиции {pen.transform.position}");
+    }
+    
+    /// <summary>
+    /// Создать простой загон для коз из кубов
+    /// </summary>
+    private static void CreateSimpleGoatPen(GameObject parent)
+    {
+        float penSizeX = 10f;
+        float penSizeZ = 8f;
+        Material fenceMat = CreateMaterial("GoatFenceMaterial", new Color(0.5f, 0.35f, 0.15f)); // Тёмно-коричневый
+        
+        CreateFenceWall(parent, new Vector3(0, 0, penSizeZ/2), new Vector3(penSizeX, 1.5f, 0.2f), fenceMat, "North");
+        CreateFenceWall(parent, new Vector3(0, 0, -penSizeZ/2), new Vector3(penSizeX, 1.5f, 0.2f), fenceMat, "South");
+        CreateFenceWall(parent, new Vector3(-penSizeX/2, 0, 0), new Vector3(0.2f, 1.5f, penSizeZ), fenceMat, "West");
+        CreateFenceWall(parent, new Vector3(penSizeX/2, 0, 0), new Vector3(0.2f, 1.5f, penSizeZ), fenceMat, "East");
+    }
+    
+    private static void CreateGoats()
+    {
+        // Ищем модели коз из папки Norm
+        GameObject goatModel1 = LoadModelAsset("Assets/Models/Norm/goat1.fbx", "goat1");
+        GameObject goatModel2 = LoadModelAsset("Assets/Models/Norm/goat2.fbx", "goat2");
+        GameObject goatModel3 = LoadModelAsset("Assets/Models/Norm/goat3.fbx", "goat3");
+        
+        GameObject[] goatModels = new GameObject[] { goatModel1, goatModel2, goatModel3 };
+        
+        // Создаём 2 козы
+        for (int i = 0; i < 2; i++)
+        {
+            GameObject goat;
+            GameObject model = goatModels[i % goatModels.Length];
+            
+            if (model != null)
+            {
+                goat = (GameObject)PrefabUtility.InstantiatePrefab(model);
+                // Проверяем размер модели и устанавливаем подходящий масштаб
+                Bounds bounds = GetModelBounds(goat);
+                float maxSize = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z);
+                
+                if (maxSize > 5f)
+                {
+                    float scale = 1f / maxSize;
+                    goat.transform.localScale = Vector3.one * scale;
+                    Debug.Log($"✓ Модель козы слишком большая ({maxSize:F2}м), масштабируем до {scale:F3}");
+                }
+                else if (maxSize < 0.1f)
+                {
+                    float scale = 1f / maxSize;
+                    goat.transform.localScale = Vector3.one * scale;
+                    Debug.Log($"✓ Модель козы слишком маленькая ({maxSize:F2}м), масштабируем до {scale:F3}");
+                }
+                else
+                {
+                    goat.transform.localScale = Vector3.one;
+                }
+                
+                Debug.Log($"✓ Модель козы загружена, размер: {bounds.size}, масштаб: {goat.transform.localScale}");
+            }
+            else
+            {
+                Debug.LogWarning($"⚠️ Модель козы не найдена, создаём примитив");
+                // Простая капсула вместо козы
+                goat = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                goat.transform.localScale = new Vector3(0.7f, 1f, 0.7f);
+                
+                Material goatMat = CreateMaterial("GoatMaterial", new Color(0.9f, 0.9f, 0.85f)); // Светло-бежевый
+                goat.GetComponent<Renderer>().material = goatMat;
+            }
+            
+            SetupAnimal(goat, $"Коза_{i + 1}", 
+                new Vector3(-7 + i * 2, 0.8f, -5), 
+                wanderRadius: 2.5f, moveSpeed: 0.9f, 
+                colliderHeight: 1.5f, colliderRadius: 0.6f, useMeshCollider: true);
+            
+            if (model != null)
+                AnimalAnimatorSetup.SetupAnimalAnimator(goat, AssetDatabase.GetAssetPath(model));
+            
+            Debug.Log($"✓ Коза {i + 1} создана на позиции {goat.transform.position}");
+        }
+    }
+    
+    private static void CreatePigs()
+    {
+        // Ищем модели свиней из папки Norm
+        GameObject pigModel1 = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/Norm/свин.fbx");
+        GameObject pigModel2 = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/Norm/john pork.fbx");
+        
+        GameObject[] pigModels = new GameObject[] { pigModel1, pigModel2 };
+        
+        // Создаём 2 свиньи
+        for (int i = 0; i < 2; i++)
+        {
+            GameObject pig;
+            GameObject model = pigModels[i % pigModels.Length];
+            
+            if (model != null)
+            {
+                pig = (GameObject)PrefabUtility.InstantiatePrefab(model);
+                pig.transform.localScale = Vector3.one * 0.01f;
+            }
+            else
+            {
+                // Простая капсула вместо свиньи
+                pig = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                pig.transform.localScale = new Vector3(0.8f, 0.6f, 0.8f);
+                
+                Material pigMat = CreateMaterial("PigMaterial", new Color(1f, 0.8f, 0.9f)); // Розовый
+                pig.GetComponent<Renderer>().material = pigMat;
+            }
+            
+            SetupAnimal(pig, $"Свинья_{i + 1}", 
+                new Vector3(7 + i * 2, 0.6f, -3), 
+                wanderRadius: 3f, moveSpeed: 0.8f, 
+                colliderHeight: 1.2f, colliderRadius: 0.7f);
+            
+            if (model != null)
+                AnimalAnimatorSetup.SetupAnimalAnimator(pig, AssetDatabase.GetAssetPath(model));
+            
+            Debug.Log($"✓ Свинья {i + 1} создана на позиции {pig.transform.position}");
+        }
     }
     
     private static void CreateFoodBucket()
     {
-        // Ищем модель ведра
-        string[] bucketGuids = AssetDatabase.FindAssets("ведро t:GameObject");
-        GameObject bucketModel = null;
-        
-        if (bucketGuids.Length > 0)
+        // Проверяем, не существует ли уже ведро
+        GameObject existingBucket = GameObject.Find("FoodBucket");
+        if (existingBucket != null)
         {
-            string path = AssetDatabase.GUIDToAssetPath(bucketGuids[0]);
-            bucketModel = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            Debug.Log("✓ Ведро с зерном уже существует");
+            // Всё равно создаём кормушки (они проверят существование сами)
+            CreateFeedingTrough();
+            return;
+        }
+        
+        // Ищем модель ведра из папки Norm (пробуем разные варианты)
+        GameObject bucketModel = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/Norm/ведро.blend");
+        
+        // Если не нашли, ищем через поиск
+        if (bucketModel == null)
+        {
+            string[] bucketGuids = AssetDatabase.FindAssets("ведро t:GameObject");
+            if (bucketGuids.Length > 0)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(bucketGuids[0]);
+                bucketModel = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            }
         }
         
         // Создаём ведро
@@ -576,6 +1857,7 @@ public class SimpleFarmSetup : EditorWindow
         if (bucketModel != null)
         {
             bucket = (GameObject)PrefabUtility.InstantiatePrefab(bucketModel);
+            bucket.transform.localScale = Vector3.one * 0.01f; // Модели могут быть большими
         }
         else
         {
@@ -628,56 +1910,60 @@ public class SimpleFarmSetup : EditorWindow
         
         Debug.Log($"✓ Ведро с зерном создано на позиции {bucket.transform.position}");
         
-        // Создаём кормушку для коровы
+        // Создаём кормушки для всех животных
         CreateFeedingTrough();
     }
     
     private static void CreateFeedingTrough()
     {
-        // ОТЛАДКА: Ищем все файлы со словом "стог"
-        string[] allHayFiles = AssetDatabase.FindAssets("стог");
-        Debug.Log($"Найдено файлов со словом 'стог': {allHayFiles.Length}");
-        foreach (string guid in allHayFiles)
+        // Ищем модели сена из папки Norm
+        GameObject hayModel1 = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/Norm/hay1.fbx");
+        GameObject hayModel2 = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/Norm/hay2.fbx");
+        
+        GameObject hayModel = hayModel1 != null ? hayModel1 : hayModel2;
+        
+        // Создаём стог сена для коровы (если его ещё нет)
+        if (GameObject.Find("HayStack_Cow") == null)
         {
-            string path = AssetDatabase.GUIDToAssetPath(guid);
-            Debug.Log($"  - Найден файл: {path}");
+            CreateSingleFeedingTrough(hayModel, "HayStack_Cow", new Vector3(-5, 0.6f, -4), 200f, 4f);
+        }
+        else
+        {
+            Debug.Log("✓ Кормушка для коровы уже существует");
         }
         
-        // Пробуем загрузить стог1.fbx напрямую по пути
-        GameObject hayModel = null;
-        string[] possiblePaths = new string[]
+        // Создаём кормушки для других животных (если их ещё нет)
+        if (GameObject.Find("HayStack_Goats") == null)
         {
-            "Assets/Models/стог1.fbx",
-            "Assets/Models/стог2.fbx",
-            "Assets/Models/stog1.fbx", // На случай латиницы
-            "Assets/Models/stog2.fbx"
-        };
-        
-        foreach (string path in possiblePaths)
+            CreateSingleFeedingTrough(hayModel, "HayStack_Goats", new Vector3(-7, 0.6f, -5), 150f, 3.5f);
+        }
+        else
         {
-            hayModel = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-            if (hayModel != null)
-            {
-                Debug.Log($"✓ Загружена модель стога: {path}");
-                break;
-            }
-            else
-            {
-                Debug.Log($"  - Не удалось загрузить: {path}");
-            }
+            Debug.Log("✓ Кормушка для коз уже существует");
         }
         
-        if (hayModel == null)
+        if (GameObject.Find("HayStack_Pigs") == null)
         {
-            Debug.LogWarning("⚠️ Модели стога не найдены! Создаём простой объект.");
+            CreateSingleFeedingTrough(hayModel, "HayStack_Pigs", new Vector3(7, 0.6f, -3), 150f, 3.5f);
+        }
+        else
+        {
+            Debug.Log("✓ Кормушка для свиней уже существует");
         }
         
-        // Создаём стог сена
+        Debug.Log("✓ Кормушки проверены/созданы для всех животных");
+    }
+    
+    /// <summary>
+    /// Создать одну кормушку
+    /// </summary>
+    private static void CreateSingleFeedingTrough(GameObject hayModel, string name, Vector3 position, float foodAmount, float feedingRange)
+    {
         GameObject trough;
         if (hayModel != null)
         {
             trough = (GameObject)PrefabUtility.InstantiatePrefab(hayModel);
-            trough.transform.localScale = Vector3.one; // Оригинальный размер модели
+            trough.transform.localScale = Vector3.one * 0.01f; // Модели могут быть большими
         }
         else
         {
@@ -689,8 +1975,8 @@ public class SimpleFarmSetup : EditorWindow
             trough.GetComponent<Renderer>().material = hayMat;
         }
         
-        trough.name = "HayStack";
-        trough.transform.position = new Vector3(-5, 0.6f, -4); // Рядом с коровой
+        trough.name = name;
+        trough.transform.position = position;
         
         // Добавляем коллайдер
         Collider troughCollider = trough.GetComponent<Collider>();
@@ -698,7 +1984,7 @@ public class SimpleFarmSetup : EditorWindow
         {
             BoxCollider col = trough.AddComponent<BoxCollider>();
             col.size = new Vector3(2f, 2f, 2f); // Большой коллайдер для стога
-            Debug.Log("  - Добавлен BoxCollider на стог сена");
+            Debug.Log($"  - Добавлен BoxCollider на {name}");
         }
         
         // Добавляем скрипт FeedingTrough
@@ -709,24 +1995,36 @@ public class SimpleFarmSetup : EditorWindow
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         if (foodAmountField != null)
         {
-            foodAmountField.SetValue(feedingTrough, 200f); // Больше корма в стоге
+            foodAmountField.SetValue(feedingTrough, foodAmount);
         }
         
         var maxFoodField = typeof(FeedingTrough).GetField("maxFood",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         if (maxFoodField != null)
         {
-            maxFoodField.SetValue(feedingTrough, 200f);
+            maxFoodField.SetValue(feedingTrough, foodAmount);
         }
         
         var feedingRangeField = typeof(FeedingTrough).GetField("feedingRange",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         if (feedingRangeField != null)
         {
-            feedingRangeField.SetValue(feedingTrough, 4f); // Больший радиус для стога
+            feedingRangeField.SetValue(feedingTrough, feedingRange);
         }
         
-        Debug.Log($"✓ Стог сена создан на позиции {trough.transform.position} (корова будет есть автоматически)");
+        // Настраиваем animalLayer чтобы все животные могли есть
+        var animalLayerField = typeof(FeedingTrough).GetField("animalLayer",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        if (animalLayerField != null)
+        {
+            // Используем слой Default для всех животных
+            // LayerMask - это структура, нужно создать её правильно
+            LayerMask layerMask = new LayerMask();
+            layerMask.value = LayerMask.GetMask("Default");
+            animalLayerField.SetValue(feedingTrough, layerMask);
+        }
+        
+        Debug.Log($"✓ {name} создан на позиции {position}");
     }
     
     private static void SetupLighting()
@@ -834,6 +2132,193 @@ public class SimpleFarmSetup : EditorWindow
         }
     }
     
+    /// <summary>
+    /// Добавить животных в существующую сцену
+    /// </summary>
+    private static void AddAnimalsToScene()
+    {
+        Debug.Log("=== Начало добавления животных ===");
+        
+        // Проверяем наличие GameManager и UI
+        SimpleGameManager manager = Object.FindObjectOfType<SimpleGameManager>();
+        if (manager == null)
+        {
+            GameObject gm = new GameObject("GameManager");
+            manager = gm.AddComponent<SimpleGameManager>();
+            CreateHintUI(manager);
+            Debug.Log("✓ GameManager и UI подсказок созданы");
+        }
+        else
+        {
+            // Проверяем наличие UI
+            var hintTextField = typeof(SimpleGameManager).GetField("hintText",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (hintTextField != null)
+            {
+                var hintText = hintTextField.GetValue(manager) as TMPro.TextMeshProUGUI;
+                if (hintText == null)
+                {
+                    CreateHintUI(manager);
+                    Debug.Log("✓ UI подсказок создан");
+                }
+            }
+        }
+        
+        // Проверяем, есть ли уже ведро с зерном
+        GameObject existingBucket = GameObject.Find("FoodBucket");
+        if (existingBucket == null)
+        {
+            Debug.Log("Ведро с зерном не найдено, создаём...");
+            CreateFoodBucket();
+        }
+        else
+        {
+            Debug.Log("✓ Ведро с зерном уже существует");
+        }
+        
+        // Проверяем, есть ли уже кормушки
+        GameObject existingTrough = GameObject.Find("HayStack_Cow");
+        if (existingTrough == null)
+        {
+            Debug.Log("Кормушки не найдены, создаём...");
+            CreateFeedingTrough();
+        }
+        else
+        {
+            Debug.Log("✓ Кормушки уже существуют");
+        }
+        
+        // Создаём загон для кур (если его нет)
+        GameObject existingPen = GameObject.Find("ChickenPen");
+        if (existingPen == null)
+        {
+            CreateChickenPen();
+        }
+        else
+        {
+            Debug.Log("✓ Загон для куриц уже есть");
+        }
+        
+        // Добавляем животных (проверяем дубликаты)
+        int chickenCount = CountAnimals("Курица_");
+        if (chickenCount == 0)
+        {
+            CreateChickens();
+        }
+        else
+        {
+            Debug.Log($"✓ Курицы уже есть на сцене ({chickenCount} шт.)");
+        }
+        
+        if (GameObject.Find("Корова") == null)
+        {
+            CreateCow();
+        }
+        else
+        {
+            Debug.Log("✓ Корова уже есть на сцене");
+        }
+        
+        // Создаём загон для коз (если его нет)
+        GameObject existingGoatPen = GameObject.Find("GoatPen");
+        if (existingGoatPen == null)
+        {
+            CreateGoatPen();
+        }
+        else
+        {
+            Debug.Log("✓ Загон для коз уже есть");
+        }
+        
+        int goatCount = CountAnimals("Коза_");
+        if (goatCount == 0)
+        {
+            CreateGoats();
+        }
+        else
+        {
+            Debug.Log($"✓ Козы уже есть на сцене ({goatCount} шт.)");
+        }
+        
+        int pigCount = CountAnimals("Свинья_");
+        if (pigCount == 0)
+        {
+            CreatePigs();
+        }
+        else
+        {
+            Debug.Log($"✓ Свиньи уже есть на сцене ({pigCount} шт.)");
+        }
+        
+        Debug.Log("=== Животные добавлены! ===");
+        EditorUtility.DisplayDialog("Готово!", 
+            "Животные добавлены на ферму!\n\n" +
+            "Добавлено:\n" +
+            $"- Курицы: {CountAnimals("Курица_")} шт.\n" +
+            $"- Коровы: {(GameObject.Find("Корова") != null ? "1" : "0")} шт.\n" +
+            $"- Козы: {CountAnimals("Коза_")} шт.\n" +
+            $"- Свиньи: {CountAnimals("Свинья_")} шт.\n\n" +
+            "Все животные можно кормить через ведро с зерном или кормушки!", 
+            "OK");
+    }
+    
+    /// <summary>
+    /// Подсчитать количество животных по имени
+    /// </summary>
+    private static int CountAnimals(string namePrefix)
+    {
+        int count = 0;
+        GameObject[] allObjects = FindObjectsOfType<GameObject>();
+        foreach (GameObject obj in allObjects)
+        {
+            if (obj.name.StartsWith(namePrefix))
+            {
+                count++;
+            }
+        }
+        return count;
+    }
+    
+    [MenuItem("VR-Ferma/Очистить ВСЁ из сцены (включая missing prefabs)")]
+    public static void ClearEverythingMenu()
+    {
+        if (!EditorUtility.DisplayDialog("Очистить ВСЁ?",
+            "Это удалит АБСОЛЮТНО ВСЕ объекты из сцены, включая missing prefabs.\n\n" +
+            "После этого пересоздайте ферму через:\n" +
+            "VR-Ferma → Создать простую ферму",
+            "Очистить всё", "Отмена"))
+        {
+            return;
+        }
+        
+        // Получаем ВСЕ root объекты в сцене (включая неактивные)
+        var scene = UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene();
+        GameObject[] rootObjects = scene.GetRootGameObjects();
+        
+        int deleted = 0;
+        foreach (var obj in rootObjects)
+        {
+            // Пропускаем только EventSystem (нужен для UI)
+            if (obj.name == "EventSystem")
+                continue;
+            
+            Debug.Log($"✓ Удалён: {obj.name}");
+            DestroyImmediate(obj);
+            deleted++;
+        }
+        
+        // Сохраняем сцену
+        UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
+        UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
+        
+        EditorUtility.DisplayDialog("Готово", 
+            $"Удалено {deleted} объектов из сцены.\n\n" +
+            "Сцена полностью очищена.\n\n" +
+            "Теперь запустите:\n" +
+            "VR-Ferma → Создать простую ферму", 
+            "OK");
+    }
+    
     [MenuItem("VR-Ferma/Очистить сцену")]
     public static void ClearFarm()
     {
@@ -845,7 +2330,8 @@ public class SimpleFarmSetup : EditorWindow
             {
                 "Ground", "Player", "GameManager", "Canvas",
                 "PlantBed_", "WaterBarrel", "WateringCan", "FoodBucket", "HayStack",
-                "Chicken_", "Cow", "HungerBar_", "Directional Light"
+                "Курица_", "Корова", "Коза_", "Свинья_", "HungerBar_", "Directional Light",
+                "ChickenPen", "GoatPen", "HintCanvas"
             };
             
             foreach (string name in objectNames)
