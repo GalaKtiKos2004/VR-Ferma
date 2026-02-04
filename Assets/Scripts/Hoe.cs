@@ -11,7 +11,7 @@ public class Hoe : MonoBehaviour
     [SerializeField] private LayerMask plantBedLayer;
     
     [Header("Звуки")]
-    [SerializeField] private AudioClip tillingSound;
+    [SerializeField] private AudioClip tillingSound; // Звук tyapka.mp3
     private AudioSource audioSource;
     
     [Header("VR Настройки")]
@@ -29,9 +29,16 @@ public class Hoe : MonoBehaviour
             audioSource = gameObject.AddComponent<AudioSource>();
         }
         
+        // Настраиваем AudioSource
+        audioSource.playOnAwake = false;
+        audioSource.spatialBlend = 0.5f; // 3D звук
+        
         grabInteractable = GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
         
         isVRMode = FindObjectOfType<UnityEngine.XR.Management.XRGeneralSettings>() != null;
+        
+        // Логирование для диагностики
+        Debug.Log($"[Hoe] Инициализирован. Звук назначен: {tillingSound != null}, AudioSource: {audioSource != null}");
     }
     
     private void Update()
@@ -46,12 +53,29 @@ public class Hoe : MonoBehaviour
         // VR режим - используем при нажатии триггера
         if (isVRMode && grabInteractable != null && grabInteractable.isSelected)
         {
-            if (Input.GetAxis("XRI_Right_Trigger") > 0.5f || Input.GetAxis("XRI_Left_Trigger") > 0.5f)
+            float triggerValue = Mathf.Max(Input.GetAxis("XRI_Right_Trigger"), Input.GetAxis("XRI_Left_Trigger"));
+            if (triggerValue > 0.5f)
             {
                 TryTillBed();
             }
         }
         // Non-VR режим - взрыхление обрабатывается через NonVRPlayerController
+    }
+    
+    /// <summary>
+    /// Воспроизвести звук взрыхления (публичный метод для вызова извне)
+    /// </summary>
+    public void PlayTillingSound()
+    {
+        if (tillingSound != null && audioSource != null)
+        {
+            audioSource.PlayOneShot(tillingSound);
+            Debug.Log($"[Hoe] Воспроизведен звук: {tillingSound.name}");
+        }
+        else
+        {
+            Debug.LogWarning($"[Hoe] Звук не может быть воспроизведен! tillingSound={tillingSound != null}, audioSource={audioSource != null}");
+        }
     }
     
     private void TryTillBed()
@@ -67,10 +91,8 @@ public class Hoe : MonoBehaviour
                 isTilling = true;
                 bed.Till();
                 
-                if (tillingSound != null && audioSource != null)
-                {
-                    audioSource.PlayOneShot(tillingSound);
-                }
+                // Звук взрыхления
+                PlayTillingSound();
                 
                 Debug.Log("Грядка взрыхлена тяпкой!");
                 
@@ -99,6 +121,23 @@ public class Hoe : MonoBehaviour
         if (TutorialManager.Instance != null)
         {
             TutorialManager.Instance.OnHoeTaken();
+        }
+    }
+    
+    /// <summary>
+    /// Тестовое воспроизведение звука (для проверки в Inspector)
+    /// </summary>
+    [ContextMenu("Тест: Воспроизвести звук")]
+    public void TestPlaySound()
+    {
+        if (tillingSound != null && audioSource != null)
+        {
+            audioSource.PlayOneShot(tillingSound);
+            Debug.Log($"[Hoe] Тест: воспроизведен звук {tillingSound.name}");
+        }
+        else
+        {
+            Debug.LogWarning($"[Hoe] Тест: звук не может быть воспроизведен! tillingSound={tillingSound != null}, audioSource={audioSource != null}");
         }
     }
 }

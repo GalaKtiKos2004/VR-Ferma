@@ -11,7 +11,7 @@ public class Rake : MonoBehaviour
     [SerializeField] private LayerMask plantBedLayer;
     
     [Header("Звуки")]
-    [SerializeField] private AudioClip tillingSound;
+    [SerializeField] private AudioClip tillingSound; // Звук dig.mp3
     private AudioSource audioSource;
     
     [Header("VR Настройки")]
@@ -29,10 +29,17 @@ public class Rake : MonoBehaviour
             audioSource = gameObject.AddComponent<AudioSource>();
         }
         
+        // Настраиваем AudioSource
+        audioSource.playOnAwake = false;
+        audioSource.spatialBlend = 0.5f; // 3D звук
+        
         grabInteractable = GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
         
         // Определяем режим (VR или нет)
         isVRMode = FindObjectOfType<UnityEngine.XR.Management.XRGeneralSettings>() != null;
+        
+        // Логирование для диагностики
+        Debug.Log($"[Rake] Инициализирован. Звук назначен: {tillingSound != null}, AudioSource: {audioSource != null}");
     }
     
     private void Update()
@@ -48,7 +55,8 @@ public class Rake : MonoBehaviour
         if (isVRMode && grabInteractable != null && grabInteractable.isSelected)
         {
             // Проверяем нажатие триггера на контроллере
-            if (Input.GetAxis("XRI_Right_Trigger") > 0.5f || Input.GetAxis("XRI_Left_Trigger") > 0.5f)
+            float triggerValue = Mathf.Max(Input.GetAxis("XRI_Right_Trigger"), Input.GetAxis("XRI_Left_Trigger"));
+            if (triggerValue > 0.5f)
             {
                 TryTillBed();
             }
@@ -56,6 +64,22 @@ public class Rake : MonoBehaviour
         // Non-VR режим - используем на ЛКМ (если грабли в руках через NonVRPlayerController)
         // В Non-VR взрыхление обрабатывается через NonVRPlayerController при взаимодействии с грядкой
         // Здесь оставляем для совместимости
+    }
+    
+    /// <summary>
+    /// Воспроизвести звук взрыхления (публичный метод для вызова извне)
+    /// </summary>
+    public void PlayTillingSound()
+    {
+        if (tillingSound != null && audioSource != null)
+        {
+            audioSource.PlayOneShot(tillingSound);
+            Debug.Log($"[Rake] Воспроизведен звук: {tillingSound.name}");
+        }
+        else
+        {
+            Debug.LogWarning($"[Rake] Звук не может быть воспроизведен! tillingSound={tillingSound != null}, audioSource={audioSource != null}");
+        }
     }
     
     /// <summary>
@@ -76,10 +100,7 @@ public class Rake : MonoBehaviour
                 bed.Rake();
                 
                 // Звук взрыхления
-                if (tillingSound != null && audioSource != null)
-                {
-                    audioSource.PlayOneShot(tillingSound);
-                }
+                PlayTillingSound();
                 
                 Debug.Log("Грядка разрыхлена граблями!");
                 
@@ -111,6 +132,23 @@ public class Rake : MonoBehaviour
         if (TutorialManager.Instance != null)
         {
             TutorialManager.Instance.OnRakeTaken();
+        }
+    }
+    
+    /// <summary>
+    /// Тестовое воспроизведение звука (для проверки в Inspector)
+    /// </summary>
+    [ContextMenu("Тест: Воспроизвести звук")]
+    public void TestPlaySound()
+    {
+        if (tillingSound != null && audioSource != null)
+        {
+            audioSource.PlayOneShot(tillingSound);
+            Debug.Log($"[Rake] Тест: воспроизведен звук {tillingSound.name}");
+        }
+        else
+        {
+            Debug.LogWarning($"[Rake] Тест: звук не может быть воспроизведен! tillingSound={tillingSound != null}, audioSource={audioSource != null}");
         }
     }
 }

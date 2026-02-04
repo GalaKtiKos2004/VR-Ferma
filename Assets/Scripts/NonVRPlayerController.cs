@@ -454,6 +454,8 @@ public class NonVRPlayerController : MonoBehaviour
             {
                 if (showDebug) Debug.Log("Взрыхляем грядку тяпкой");
                 bed.Till();
+                // Воспроизводим звук тяпки
+                heldHoe.PlayTillingSound();
                 if (TutorialManager.Instance != null)
                     TutorialManager.Instance.OnBedTilled();
                 // Подсказку показывает TutorialManager; вне туториала — своя
@@ -467,6 +469,8 @@ public class NonVRPlayerController : MonoBehaviour
             {
                 if (showDebug) Debug.Log("Разрыхляем грядку граблями");
                 bed.Rake();
+                // Воспроизводим звук граблей
+                heldRake.PlayTillingSound();
                 if (TutorialManager.Instance != null)
                     TutorialManager.Instance.OnBedRaked();
                 // Подсказку показывает TutorialManager; вне туториала — своя

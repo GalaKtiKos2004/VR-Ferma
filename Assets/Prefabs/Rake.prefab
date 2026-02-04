@@ -52,7 +52,7 @@ MonoBehaviour:
   plantBedLayer:
     serializedVersion: 2
     m_Bits: 0
-  tillingSound: {fileID: 0}
+  tillingSound: {fileID: 8300000, guid: 4cdb2d5616f5d33499d02e7b57121959, type: 3}
   isVRMode: 1
 --- !u!54 &5894069474441076417
 Rigidbody:
