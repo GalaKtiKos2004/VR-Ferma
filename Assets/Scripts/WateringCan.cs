@@ -17,7 +17,7 @@ public class WateringCan : MonoBehaviour
     [SerializeField] private Transform waterSpout; // Откуда льется вода
     
     [Header("Звуки")]
-    [SerializeField] private AudioClip wateringSound;
+    [SerializeField] private AudioClip wateringSound; // Звук running-water.mp3
     [SerializeField] private AudioClip refillSound;
     private AudioSource audioSource;
     

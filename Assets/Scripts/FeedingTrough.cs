@@ -105,6 +105,26 @@ public class FeedingTrough : MonoBehaviour
     }
     
     /// <summary>
+    /// Добавить еду в кормушку (из ведра)
+    /// </summary>
+    public void AddFood(float amount)
+    {
+        foodAmount += amount;
+        if (foodAmount > maxFood)
+        {
+            foodAmount = maxFood;
+        }
+        
+        if (refillSound != null && audioSource != null)
+        {
+            audioSource.PlayOneShot(refillSound);
+        }
+        
+        UpdateVisuals();
+        Debug.Log($"[FeedingTrough] {name}: добавлено {amount:F0} еды. Всего: {foodAmount:F0}/{maxFood}");
+    }
+    
+    /// <summary>
     /// Взять корм из кормушки
     /// </summary>
     public bool TakeFood(float amount)

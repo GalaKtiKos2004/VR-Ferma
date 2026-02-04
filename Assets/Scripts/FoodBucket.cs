@@ -21,7 +21,12 @@ public class FoodBucket : MonoBehaviour
     
     [Header("Звуки")]
     [SerializeField] private AudioClip takeSound;
+    [SerializeField] private AudioClip pourSound; // Звук высыпания в кормушку
     private AudioSource audioSource;
+    
+    [Header("Взаимодействие с кормушкой")]
+    [SerializeField] private float pourRange = 2f; // Расстояние для высыпания в кормушку
+    [SerializeField] private float pourAmount = 20f; // Сколько зерна высыпаем за раз
     
     private void Start()
     {
@@ -63,11 +68,27 @@ public class FoodBucket : MonoBehaviour
     }
     
     /// <summary>
-    /// VR-взаимодействие: взять зерно
+    /// VR-взаимодействие: взять зерно или высыпать в кормушку
     /// </summary>
     private void OnVRInteract(SelectEnterEventArgs args)
     {
-        // Ищем FoodInHand в руке игрока
+        // Проверяем, есть ли рядом кормушка для высыпания
+        FeedingTrough nearbyTrough = FindNearbyTrough();
+        
+        if (nearbyTrough != null && nearbyTrough.GetFoodPercentage() < 1f) // Если кормушка не полная
+        {
+            // Высыпаем зерно в кормушку
+            if (PourIntoTrough(nearbyTrough))
+            {
+                if (SimpleGameManager.Instance != null)
+                {
+                    SimpleGameManager.Instance.ShowHint($"🌾 Зерно высыпано в кормушку!");
+                }
+                return;
+            }
+        }
+        
+        // Иначе берем зерно в руку
         var hand = args.interactorObject.transform;
         var foodInHand = hand.GetComponentInChildren<FoodInHand>();
         
@@ -167,6 +188,53 @@ public class FoodBucket : MonoBehaviour
             float scale = Mathf.Lerp(0.1f, 0.6f, fillPercent);
             foodVisual.transform.localScale = Vector3.one * scale;
         }
+    }
+    
+    /// <summary>
+    /// Найти ближайшую кормушку
+    /// </summary>
+    private FeedingTrough FindNearbyTrough()
+    {
+        FeedingTrough[] troughs = FindObjectsOfType<FeedingTrough>();
+        
+        foreach (FeedingTrough trough in troughs)
+        {
+            float distance = Vector3.Distance(transform.position, trough.transform.position);
+            if (distance <= pourRange)
+            {
+                return trough;
+            }
+        }
+        
+        return null;
+    }
+    
+    /// <summary>
+    /// Высыпать зерно в кормушку
+    /// </summary>
+    private bool PourIntoTrough(FeedingTrough trough)
+    {
+        if (currentFood < pourAmount)
+        {
+            Debug.Log("В ведре недостаточно зерна для высыпания!");
+            if (SimpleGameManager.Instance != null)
+            {
+                SimpleGameManager.Instance.ShowHint("Недостаточно зерна в ведре! 🪣");
+            }
+            return false;
+        }
+        
+        currentFood -= pourAmount;
+        trough.AddFood(pourAmount);
+        UpdateVisuals();
+        
+        if (pourSound != null && audioSource != null)
+        {
+            audioSource.PlayOneShot(pourSound);
+        }
+        
+        Debug.Log($"Зерно высыпано в кормушку! Осталось в ведре: {currentFood}/{maxFood}");
+        return true;
     }
     
     public float GetFoodAmount() => currentFood;

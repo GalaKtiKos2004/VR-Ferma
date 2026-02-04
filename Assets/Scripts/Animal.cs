@@ -28,7 +28,8 @@ public class Animal : MonoBehaviour
     [Header("Звуки")]
     [SerializeField] private AudioClip happySound;
     [SerializeField] private AudioClip hungrySound;
-    [SerializeField] private AudioClip eatSound;
+    [SerializeField] private AudioClip eatSound; // Звук bite_cartoon_-_big_chomp.mp3 для кормления
+    [SerializeField] private AudioClip petSound; // Звук животного при поглаживании (курица.mp3, корова.mp3, коза.mp3, свинья.mp3)
     private AudioSource audioSource;
     
     [Header("Продукция")]
@@ -181,6 +182,7 @@ public class Animal : MonoBehaviour
             currentHappiness = maxHappiness;
         }
         
+        // Звук кормления (bite_cartoon_-_big_chomp.mp3)
         if (eatSound != null && audioSource != null)
         {
             audioSource.PlayOneShot(eatSound);
@@ -200,15 +202,42 @@ public class Animal : MonoBehaviour
                 Debug.Log($"[Feed] {name}: Animator переинициализирован");
             }
             
-            // Устанавливаем триггер
+            // Убеждаемся, что аниматор включен
+            if (!animator.enabled)
+            {
+                animator.enabled = true;
+                Debug.LogWarning($"[Feed] {name}: Animator был выключен, включен заново");
+            }
+            
+            // Пытаемся запустить анимацию Eat двумя способами:
+            // 1. Через триггер (если переход настроен правильно)
+            animator.ResetTrigger(ParamEat);
             animator.SetTrigger(ParamEat);
-            animator.Update(0); // Принудительное обновление для применения триггера
             
-            Debug.Log($"[Feed] {name}: триггер Eat установлен, isInitialized={animator.isInitialized}");
+            // 2. Через CrossFade напрямую (более надежный способ)
+            try
+            {
+                animator.CrossFade("Eat", 0.1f, 0, 0f);
+                Debug.Log($"[Feed] {name}: CrossFade к Eat выполнен");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[Feed] {name}: CrossFade не удался: {e.Message}, используем только триггер");
+            }
             
-            // Проверяем состояние через 0.1 сек
+            // Принудительно обновляем аниматор несколько раз для гарантии
+            for (int i = 0; i < 5; i++)
+            {
+                animator.Update(0.02f);
+            }
+            
+            Debug.Log($"[Feed] {name}: триггер Eat установлен, CrossFade выполнен, isInitialized={animator.isInitialized}, enabled={animator.enabled}");
+            
+            // Проверяем состояние через небольшую задержку
             if (Application.isPlaying)
-                StartCoroutine(CheckAnimationStateAfterDelay("Eat", 0.1f));
+            {
+                StartCoroutine(CheckAnimationStateAfterDelay("Eat", 0.15f));
+            }
         }
         else
         {
@@ -222,6 +251,12 @@ public class Animal : MonoBehaviour
         if (TutorialManager.Instance != null)
         {
             TutorialManager.Instance.OnAnimalFed();
+        }
+        
+        // Уведомляем AchievementManager
+        if (AchievementManager.Instance != null)
+        {
+            AchievementManager.Instance.RegisterFeed(this);
         }
     }
     
@@ -243,8 +278,14 @@ public class Animal : MonoBehaviour
             currentHappiness = maxHappiness;
         }
         
-        if (happySound != null && audioSource != null)
+        // Звук животного при поглаживании (курица.mp3, корова.mp3, коза.mp3, свинья.mp3)
+        if (petSound != null && audioSource != null)
         {
+            audioSource.PlayOneShot(petSound);
+        }
+        else if (happySound != null && audioSource != null)
+        {
+            // Fallback на happySound если petSound не назначен
             audioSource.PlayOneShot(happySound);
         }
         
@@ -291,6 +332,12 @@ public class Animal : MonoBehaviour
         if (TutorialManager.Instance != null)
         {
             TutorialManager.Instance.OnAnimalPet();
+        }
+        
+        // Уведомляем AchievementManager
+        if (AchievementManager.Instance != null)
+        {
+            AchievementManager.Instance.RegisterPet(this);
         }
     }
     
@@ -361,6 +408,61 @@ public class Animal : MonoBehaviour
     }
     
     /// <summary>
+    /// Тестовый метод: принудительно запустить анимацию поедания (для отладки)
+    /// </summary>
+    [ContextMenu("Тест: Запустить анимацию поедания")]
+    public void TestEatAnimation()
+    {
+        if (animator == null)
+            animator = GetComponentInChildren<Animator>();
+        
+        if (animator != null && animator.runtimeAnimatorController != null)
+        {
+            if (!animator.isInitialized)
+            {
+                animator.Rebind();
+                animator.Update(0);
+            }
+            
+            animator.enabled = true;
+            
+            // Пробуем оба способа
+            animator.ResetTrigger(ParamEat);
+            animator.SetTrigger(ParamEat);
+            
+            try
+            {
+                animator.CrossFade("Eat", 0.1f, 0, 0f);
+                Debug.Log($"[TestEat] {name}: CrossFade к Eat выполнен");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[TestEat] {name}: CrossFade не удался: {e.Message}");
+            }
+            
+            for (int i = 0; i < 5; i++)
+            {
+                animator.Update(0.02f);
+            }
+            
+            var state = animator.GetCurrentAnimatorStateInfo(0);
+            int eatHash = Animator.StringToHash("Eat");
+            string stateName = state.shortNameHash == Animator.StringToHash("Idle") ? "Idle" :
+                              state.shortNameHash == Animator.StringToHash("Walk") ? "Walk" :
+                              state.shortNameHash == Animator.StringToHash("Eat") ? "Eat" :
+                              state.shortNameHash == Animator.StringToHash("Happy") ? "Happy" :
+                              state.shortNameHash.ToString();
+            
+            Debug.Log($"[TestEat] {name}: Триггер установлен, CrossFade выполнен. Текущее состояние: {stateName} {(state.shortNameHash == eatHash ? "✓" : "❌")}, normalizedTime={state.normalizedTime:F2}, hash={state.shortNameHash}");
+        }
+        else
+        {
+            Debug.LogError($"[TestEat] {name}: Animator или Controller отсутствует! Animator={animator != null}, Controller={animator?.runtimeAnimatorController != null}");
+        }
+    }
+    
+    
+    /// <summary>
     /// Проверить состояние анимации через задержку (для отладки триггеров)
     /// </summary>
     private System.Collections.IEnumerator CheckAnimationStateAfterDelay(string expectedState, float delay)
@@ -371,20 +473,74 @@ public class Animal : MonoBehaviour
         {
             var state = animator.GetCurrentAnimatorStateInfo(0);
             int hash = state.shortNameHash;
+            int expectedHash = Animator.StringToHash(expectedState);
             string stateName = hash == Animator.StringToHash("Idle") ? "Idle" :
                                hash == Animator.StringToHash("Walk") ? "Walk" :
                                hash == Animator.StringToHash("HungryIdle") ? "HungryIdle" :
                                hash == Animator.StringToHash("Eat") ? "Eat" :
                                hash == Animator.StringToHash("Happy") ? "Happy" : hash.ToString();
             
-            if (stateName == expectedState)
+            if (hash == expectedHash || stateName == expectedState)
+            {
                 Debug.Log($"[AnimCheck] {name}: ✓ Анимация {expectedState} играет! NormalizedTime={state.normalizedTime:F2}");
+            }
             else
-                Debug.LogWarning($"[AnimCheck] {name}: ❌ Ожидали {expectedState}, но играет {stateName}");
+            {
+                Debug.LogWarning($"[AnimCheck] {name}: ❌ Ожидали {expectedState}, но играет {stateName} (hash: {hash} vs {expectedHash})");
+                
+                // Если ожидали Eat, но играет что-то другое, пытаемся принудительно запустить
+                if (expectedState == "Eat")
+                {
+                    Debug.LogWarning($"[AnimCheck] {name}: Пытаемся принудительно запустить Eat через CrossFade");
+                    bool success = TryForceEatAnimation();
+                    
+                    if (success)
+                    {
+                        // Проверяем еще раз после задержки
+                        yield return new WaitForSeconds(0.1f);
+                        state = animator.GetCurrentAnimatorStateInfo(0);
+                        hash = state.shortNameHash;
+                        if (hash == expectedHash)
+                        {
+                            Debug.Log($"[AnimCheck] {name}: ✓ Анимация Eat успешно запущена после принудительного вызова!");
+                        }
+                        else
+                        {
+                            Debug.LogError($"[AnimCheck] {name}: ❌ Анимация Eat все еще не запущена после принудительного вызова! Текущее: {hash}");
+                        }
+                    }
+                }
+            }
         }
         else
         {
-            Debug.LogError($"[AnimCheck] {name}: Animator не инициализирован!");
+            Debug.LogError($"[AnimCheck] {name}: Animator не инициализирован! isInitialized={animator?.isInitialized}, layerCount={animator?.layerCount}");
+        }
+    }
+    
+    /// <summary>
+    /// Попытаться принудительно запустить анимацию Eat
+    /// </summary>
+    private bool TryForceEatAnimation()
+    {
+        if (animator == null || !animator.isInitialized) return false;
+        
+        try
+        {
+            animator.CrossFade("Eat", 0.05f, 0, 0f);
+            
+            // Обновляем аниматор
+            for (int i = 0; i < 3; i++)
+            {
+                animator.Update(0.02f);
+            }
+            
+            return true;
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[AnimCheck] {name}: Ошибка при принудительном запуске Eat: {e.Message}");
+            return false;
         }
     }
     

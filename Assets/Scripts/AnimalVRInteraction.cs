@@ -148,6 +148,13 @@ public class AnimalVRInteraction : MonoBehaviour
         animal.Feed();
         lastFeedTime = Time.time;
         
+        // Визуальный эффект кормления
+        FeedingEffect feedEffect = FindObjectOfType<FeedingEffect>();
+        if (feedEffect != null)
+        {
+            feedEffect.PlayFeedEffect(animal.transform.position + Vector3.up * 0.5f);
+        }
+        
         if (SimpleGameManager.Instance != null)
         {
             SimpleGameManager.Instance.ShowHint("🌾 Животное накормлено!");
